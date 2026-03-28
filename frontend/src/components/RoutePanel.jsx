@@ -1,6 +1,8 @@
 export default function RoutePanel({ routeStatus, onClearRoute }) {
     const { status, payload, error } = routeStatus;
 
+    if (status === 'idle') return null;
+
     return (
         <aside className="fixed right-6 top-24 bottom-24 w-80 z-[1000] flex flex-col gap-6 pointer-events-none">
             <div className="glass-panel bg-primary/10 rounded-2xl p-6 shadow-2xl shadow-primary/5 border border-primary/20 pointer-events-auto">
@@ -8,15 +10,6 @@ export default function RoutePanel({ routeStatus, onClearRoute }) {
                     <span className="material-symbols-outlined text-primary text-sm" style={{ fontVariationSettings: "'FILL' 1" }}>route</span>
                     <h3 className="font-headline font-bold text-xs uppercase tracking-widest text-primary">Güvenli Rota</h3>
                 </div>
-
-                {/* State: IDLE */}
-                {status === 'idle' && (
-                    <div className="text-center py-8">
-                        <span className="material-symbols-outlined text-primary/30 text-5xl mb-3 block">explore</span>
-                        <p className="text-sm text-slate-200 font-medium">Rota oluşturmak için başlangıç ve hedef noktalarını girin</p>
-                        <p className="text-[10px] text-emerald-400 mt-2 font-bold uppercase tracking-widest">Üst çubuktaki alanları kullanın</p>
-                    </div>
-                )}
 
                 {/* State: LOADING */}
                 {status === 'loading' && (
