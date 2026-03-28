@@ -1,121 +1,96 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState } from 'react';
+import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import RoutePanel from './components/RoutePanel';
+import MapComponent from './components/MapComponent';
+import Legend from './components/Legend';
+import NotificationBanner from './components/NotificationBanner';
+import { geocode, getRoute, calculateSafety } from './utils/routing';
+import './index.css';
 
 function App() {
-  const [count, setCount] = useState(0)
+    const [layers, setLayers] = useState({ fire: false, flood: false });
+    const [fromInput, setFromInput] = useState('');
+    const [toInput, setToInput] = useState('');
+    
+    // status: 'idle' | 'loading' | 'success' | 'error'
+    const [routeStatus, setRouteStatus] = useState({ status: 'idle', payload: null, error: null });
 
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    const toggleLayer = (layerName) => {
+        setLayers(prev => ({ ...prev, [layerName]: !prev[layerName] }));
+    };
 
-      <div className="ticks"></div>
+    const handleCalculateRoute = async () => {
+        if (!fromInput.trim() || !toInput.trim()) {
+            setRouteStatus({ status: 'error', error: 'Lütfen başlangıç ve hedef noktalarını girin.', payload: null });
+            return;
+        }
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        setRouteStatus({ status: 'loading', payload: null, error: null });
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+        try {
+            const fromGeo = await geocode(fromInput.trim());
+            const toGeo = await geocode(toInput.trim());
+
+            if (!fromGeo || !toGeo) {
+                setRouteStatus({ status: 'error', error: 'Konum bulunamadı. Lütfen geçerli bir şehir veya adres girin.', payload: null });
+                return;
+            }
+
+            const routeObj = await getRoute(fromGeo, toGeo);
+            if (!routeObj) {
+                setRouteStatus({ status: 'error', error: 'Rota hesaplanamadı.', payload: null });
+                return;
+            }
+
+            const routeCoords = routeObj.geometry.coordinates;
+            const distKm = (routeObj.distance / 1000).toFixed(1);
+            const durationMin = Math.round(routeObj.duration / 60);
+            const safetyScore = calculateSafety(routeCoords);
+
+            setRouteStatus({
+                status: 'success',
+                error: null,
+                payload: {
+                    fromName: fromGeo.name,
+                    toName: toGeo.name,
+                    fromGeo,
+                    toGeo,
+                    routeObj,
+                    distanceKm: distKm,
+                    durationMin,
+                    safetyScore
+                }
+            });
+
+        } catch (err) {
+            console.error(err);
+            setRouteStatus({ status: 'error', error: 'Bağlantı hatası. Lütfen tekrar deneyin.', payload: null });
+        }
+    };
+
+    const handleClearRoute = () => {
+        setRouteStatus({ status: 'idle', payload: null, error: null });
+        setFromInput('');
+        setToInput('');
+    };
+
+    return (
+        <div className="relative w-full h-screen overflow-hidden bg-background text-on-background">
+            <MapComponent layers={layers} routeStatus={routeStatus} />
+            <Header 
+                fromInput={fromInput} 
+                setFromInput={setFromInput} 
+                toInput={toInput} 
+                setToInput={setToInput} 
+                onCalculateRoute={handleCalculateRoute} 
+            />
+            <NotificationBanner />
+            <Sidebar layers={layers} toggleLayer={toggleLayer} />
+            <RoutePanel routeStatus={routeStatus} onClearRoute={handleClearRoute} />
+            <Legend />
+        </div>
+    );
 }
 
-export default App
+export default App;
