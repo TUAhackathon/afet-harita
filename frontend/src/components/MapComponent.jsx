@@ -1,16 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { floodData } from '../utils/data';
 
-const API_BASE = 'http://localhost:8000';
-
-export default function MapComponent({ layers, routeStatus }) {
+export default function MapComponent({ layers, routeStatus, firePoints = [] }) {
     const mapRef = useRef(null);
     const fireLayerGroupRef = useRef(L.layerGroup());
     const floodLayerGroupRef = useRef(L.layerGroup());
     const routeLayerGroupRef = useRef(L.layerGroup());
-    const [fireDataLoaded, setFireDataLoaded] = useState(false);
-    const fireDataRef = useRef([]);
 
     useEffect(() => {
         if (!mapRef.current) {
@@ -68,72 +64,56 @@ export default function MapComponent({ layers, routeStatus }) {
         }
     }, []);
 
-    // Fetch fire data from backend when fire layer is toggled on
+    // firePoints prop değiştiğinde harita katmanını yeniden oluştur
     useEffect(() => {
-        if (layers.fire && !fireDataLoaded) {
-            fetch(`${API_BASE}/api/disasters/fire`)
-                .then(res => {
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    return res.json();
+        const fireGroup = fireLayerGroupRef.current;
+        fireGroup.clearLayers();
+
+        if (firePoints.length === 0) return;
+
+        const colorMap = {
+            green: { border: '#22c55e', fill: '#4ade80' },
+            yellow: { border: '#eab308', fill: '#facc15' },
+            red: { border: '#ff4500', fill: '#ff6b35' },
+            gray: { border: '#9ca3af', fill: '#d1d5db' },
+        };
+        const iconColorClass = {
+            green: 'text-green-500',
+            yellow: 'text-yellow-500',
+            red: 'text-orange-500',
+            gray: 'text-gray-400',
+        };
+
+        firePoints.forEach(point => {
+            const colors = colorMap[point.color] || colorMap.gray;
+
+            const circle = L.circleMarker([point.lat, point.lon], {
+                radius: point.color === 'red' ? 8 : point.color === 'yellow' ? 6 : 4,
+                color: colors.border,
+                fillColor: colors.fill,
+                fillOpacity: 0.7,
+                weight: 2,
+            });
+            circle.bindPopup(
+                `<div style="font-family: Inter, sans-serif; min-width: 160px;">
+                    <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">${point.level}</div>
+                    <div style="font-size: 11px; color: #555;">Brightness: <b>${point.brightness.toFixed(1)}</b></div>
+                    <div style="font-size: 11px; color: #555;">Konum: ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}</div>
+                </div>`
+            );
+            fireGroup.addLayer(circle);
+
+            const marker = L.marker([point.lat, point.lon], {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div class="flex flex-col items-center"><span class="material-symbols-outlined ${iconColorClass[point.color] || 'text-gray-400'} bg-white/90 rounded-full p-1 shadow-lg" style="font-variation-settings: 'FILL' 1; font-size: 14px;">local_fire_department</span></div>`,
+                    iconSize: [24, 24],
+                    iconAnchor: [12, 12]
                 })
-                .then(data => {
-                    fireDataRef.current = data;
-                    setFireDataLoaded(true);
-
-                    // Build fire markers from satellite data
-                    const fireGroup = fireLayerGroupRef.current;
-                    fireGroup.clearLayers();
-
-                    data.forEach(point => {
-                        // Color mapping for circles based on severity
-                        const colorMap = {
-                            green: { border: '#22c55e', fill: '#4ade80' },
-                            yellow: { border: '#eab308', fill: '#facc15' },
-                            red: { border: '#ff4500', fill: '#ff6b35' },
-                            gray: { border: '#9ca3af', fill: '#d1d5db' },
-                        };
-                        const colors = colorMap[point.color] || colorMap.gray;
-
-                        // Icon mapping for different severity levels
-                        const iconColorClass = {
-                            green: 'text-green-500',
-                            yellow: 'text-yellow-500',
-                            red: 'text-orange-500',
-                            gray: 'text-gray-400',
-                        };
-
-                        const circle = L.circleMarker([point.lat, point.lon], {
-                            radius: point.color === 'red' ? 8 : point.color === 'yellow' ? 6 : 4,
-                            color: colors.border,
-                            fillColor: colors.fill,
-                            fillOpacity: 0.7,
-                            weight: 2,
-                        });
-                        circle.bindPopup(
-                            `<div style="font-family: Inter, sans-serif; min-width: 160px;">
-                                <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">${point.level}</div>
-                                <div style="font-size: 11px; color: #555;">Brightness: <b>${point.brightness.toFixed(1)}</b></div>
-                                <div style="font-size: 11px; color: #555;">Konum: ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}</div>
-                            </div>`
-                        );
-                        fireGroup.addLayer(circle);
-
-                        const marker = L.marker([point.lat, point.lon], {
-                            icon: L.divIcon({
-                                className: 'custom-marker',
-                                html: `<div class="flex flex-col items-center"><span class="material-symbols-outlined ${iconColorClass[point.color] || 'text-gray-400'} bg-white/90 rounded-full p-1 shadow-lg" style="font-variation-settings: 'FILL' 1; font-size: 14px;">local_fire_department</span></div>`,
-                                iconSize: [24, 24],
-                                iconAnchor: [12, 12]
-                            })
-                        });
-                        fireGroup.addLayer(marker);
-                    });
-                })
-                .catch(err => {
-                    console.error('Fire data fetch error:', err);
-                });
-        }
-    }, [layers.fire, fireDataLoaded]);
+            });
+            fireGroup.addLayer(marker);
+        });
+    }, [firePoints]);
 
     // Toggle layers on/off
     useEffect(() => {

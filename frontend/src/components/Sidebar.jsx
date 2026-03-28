@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { fireData, floodData } from '../utils/data';
+import { floodData } from '../utils/data';
 
-export default function Sidebar({ layers, toggleLayer }) {
+export default function Sidebar({ layers, toggleLayer, fireCount = 0, fireLoading = false, fireError = null }) {
     const [isOpen, setIsOpen] = useState(true);
     const [satelliteAiActive, setSatelliteAiActive] = useState(true);
 
@@ -89,7 +89,18 @@ export default function Sidebar({ layers, toggleLayer }) {
                                     </span>
                                     <div>
                                         <div className={`text-sm font-headline transition-colors ${layers.fire ? 'text-orange-200 drop-shadow-[0_0_5px_rgba(249,115,22,0.5)]' : 'text-slate-300'}`}>Yangın Risk</div>
-                                        <div className="text-[9px] text-slate-500 font-normal normal-case tracking-normal">Tespit Edilen: <span className={`font-bold ${layers.fire ? 'text-orange-400' : ''}`}>{fireData.length} Bölge</span></div>
+                                        <div className="text-[9px] text-slate-500 font-normal normal-case tracking-normal">
+                                            Tespit Edilen:{' '}
+                                            {fireLoading ? (
+                                                <span className="text-orange-300 font-bold animate-pulse">Yükleniyor...</span>
+                                            ) : fireError ? (
+                                                <span className="text-red-400 font-bold">! Bağlantı hatası</span>
+                                            ) : (
+                                                <span className={`font-bold ${layers.fire ? 'text-orange-400' : ''}`}>
+                                                    {fireCount > 0 ? `${fireCount} Nokta` : layers.fire ? '0 Nokta' : '— Nokta'}
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className={`w-3 h-3 rounded-full transition-all shrink-0 ${layers.fire ? 'bg-orange-500 shadow-[0_0_10px_#f97316]' : 'bg-slate-700 group-hover:bg-slate-600'}`}></div>

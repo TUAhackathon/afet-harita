@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import RoutePanel from './components/RoutePanel';
@@ -6,19 +6,39 @@ import MapComponent from './components/MapComponent';
 import Legend from './components/Legend';
 import NotificationBanner from './components/NotificationBanner';
 import { geocode, getRoute, calculateSafety } from './utils/routing';
+import { fetchFirePoints } from './services/api';
 import './index.css';
 
 function App() {
     const [layers, setLayers] = useState({ fire: false, flood: false });
     const [fromInput, setFromInput] = useState('');
     const [toInput, setToInput] = useState('');
-    
+
+    // Yangın verisi — backend'den çekilir, App seviyesinde tutulur
+    const [firePoints, setFirePoints] = useState([]);
+    const [fireLoading, setFireLoading] = useState(false);
+    const [fireError, setFireError] = useState(null);
+
     // status: 'idle' | 'loading' | 'success' | 'error'
     const [routeStatus, setRouteStatus] = useState({ status: 'idle', payload: null, error: null });
 
-    const toggleLayer = (layerName) => {
+    const toggleLayer = useCallback(async (layerName) => {
+        // Yangın katmanı ilk kez açılıyorsa veriyi çek
+        if (layerName === 'fire' && !layers.fire && firePoints.length === 0 && !fireLoading) {
+            setFireLoading(true);
+            setFireError(null);
+            try {
+                const data = await fetchFirePoints();
+                setFirePoints(data);
+            } catch (err) {
+                console.error('Yangın verisi alınamadı:', err);
+                setFireError(err.message);
+            } finally {
+                setFireLoading(false);
+            }
+        }
         setLayers(prev => ({ ...prev, [layerName]: !prev[layerName] }));
-    };
+    }, [layers.fire, firePoints.length, fireLoading]);
 
     const handleCalculateRoute = async () => {
         if (!fromInput.trim() || !toInput.trim()) {
@@ -77,7 +97,7 @@ function App() {
 
     return (
         <div className="relative w-full h-screen overflow-hidden bg-background text-on-background">
-            <MapComponent layers={layers} routeStatus={routeStatus} />
+            <MapComponent layers={layers} routeStatus={routeStatus} firePoints={firePoints} />
             <Header 
                 fromInput={fromInput} 
                 setFromInput={setFromInput} 
@@ -86,7 +106,13 @@ function App() {
                 onCalculateRoute={handleCalculateRoute} 
             />
             <NotificationBanner />
-            <Sidebar layers={layers} toggleLayer={toggleLayer} />
+            <Sidebar
+                layers={layers}
+                toggleLayer={toggleLayer}
+                fireCount={firePoints.length}
+                fireLoading={fireLoading}
+                fireError={fireError}
+            />
             <RoutePanel routeStatus={routeStatus} onClearRoute={handleClearRoute} />
             <Legend />
         </div>
@@ -94,3 +120,4 @@ function App() {
 }
 
 export default App;
+
