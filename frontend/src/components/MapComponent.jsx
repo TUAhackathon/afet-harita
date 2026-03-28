@@ -1,12 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { fireData, floodData } from '../utils/data';
+import { floodData } from '../utils/data';
+
+const API_BASE = 'http://localhost:8000';
 
 export default function MapComponent({ layers, routeStatus }) {
     const mapRef = useRef(null);
     const fireLayerGroupRef = useRef(L.layerGroup());
     const floodLayerGroupRef = useRef(L.layerGroup());
     const routeLayerGroupRef = useRef(L.layerGroup());
+    const [fireDataLoaded, setFireDataLoaded] = useState(false);
+    const fireDataRef = useRef([]);
 
     useEffect(() => {
         if (!mapRef.current) {
@@ -42,24 +46,7 @@ export default function MapComponent({ layers, routeStatus }) {
 
             mapRef.current = map;
 
-            // Generate Fire Markers
-            fireData.forEach(d => {
-                const circle = L.circle(d.coords, {
-                    color: '#ff4500', fillColor: '#ff6b35', fillOpacity: 0.35, weight: 2, radius: d.radius
-                });
-                const marker = L.marker(d.coords, {
-                    icon: L.divIcon({
-                        className: 'custom-marker',
-                        html: `<div class="flex flex-col items-center"><span class="material-symbols-outlined text-orange-500 bg-white/90 rounded-full p-1 shadow-lg" style="font-variation-settings: 'FILL' 1; font-size: 18px;">local_fire_department</span><div class="text-[8px] font-bold mt-1 bg-white/90 px-2 rounded text-gray-800 whitespace-nowrap">${d.name}</div></div>`,
-                        iconSize: [30, 30],
-                        iconAnchor: [15, 15]
-                    })
-                });
-                fireLayerGroupRef.current.addLayer(circle);
-                fireLayerGroupRef.current.addLayer(marker);
-            });
-
-            // Generate Flood Markers
+            // Generate Flood Markers (static data)
             floodData.forEach(d => {
                 const circle = L.circle(d.coords, {
                     color: '#1e90ff', fillColor: '#4dabff', fillOpacity: 0.3, weight: 2, radius: d.radius
@@ -79,16 +66,85 @@ export default function MapComponent({ layers, routeStatus }) {
             // Add route layer to map
             routeLayerGroupRef.current.addTo(map);
         }
-        
+    }, []);
+
+    // Fetch fire data from backend when fire layer is toggled on
+    useEffect(() => {
+        if (layers.fire && !fireDataLoaded) {
+            fetch(`${API_BASE}/api/disasters/fire`)
+                .then(res => {
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
+                .then(data => {
+                    fireDataRef.current = data;
+                    setFireDataLoaded(true);
+
+                    // Build fire markers from satellite data
+                    const fireGroup = fireLayerGroupRef.current;
+                    fireGroup.clearLayers();
+
+                    data.forEach(point => {
+                        // Color mapping for circles based on severity
+                        const colorMap = {
+                            green: { border: '#22c55e', fill: '#4ade80' },
+                            yellow: { border: '#eab308', fill: '#facc15' },
+                            red: { border: '#ff4500', fill: '#ff6b35' },
+                            gray: { border: '#9ca3af', fill: '#d1d5db' },
+                        };
+                        const colors = colorMap[point.color] || colorMap.gray;
+
+                        // Icon mapping for different severity levels
+                        const iconColorClass = {
+                            green: 'text-green-500',
+                            yellow: 'text-yellow-500',
+                            red: 'text-orange-500',
+                            gray: 'text-gray-400',
+                        };
+
+                        const circle = L.circleMarker([point.lat, point.lon], {
+                            radius: point.color === 'red' ? 8 : point.color === 'yellow' ? 6 : 4,
+                            color: colors.border,
+                            fillColor: colors.fill,
+                            fillOpacity: 0.7,
+                            weight: 2,
+                        });
+                        circle.bindPopup(
+                            `<div style="font-family: Inter, sans-serif; min-width: 160px;">
+                                <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">${point.level}</div>
+                                <div style="font-size: 11px; color: #555;">Brightness: <b>${point.brightness.toFixed(1)}</b></div>
+                                <div style="font-size: 11px; color: #555;">Konum: ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}</div>
+                            </div>`
+                        );
+                        fireGroup.addLayer(circle);
+
+                        const marker = L.marker([point.lat, point.lon], {
+                            icon: L.divIcon({
+                                className: 'custom-marker',
+                                html: `<div class="flex flex-col items-center"><span class="material-symbols-outlined ${iconColorClass[point.color] || 'text-gray-400'} bg-white/90 rounded-full p-1 shadow-lg" style="font-variation-settings: 'FILL' 1; font-size: 14px;">local_fire_department</span></div>`,
+                                iconSize: [24, 24],
+                                iconAnchor: [12, 12]
+                            })
+                        });
+                        fireGroup.addLayer(marker);
+                    });
+                })
+                .catch(err => {
+                    console.error('Fire data fetch error:', err);
+                });
+        }
+    }, [layers.fire, fireDataLoaded]);
+
+    // Toggle layers on/off
+    useEffect(() => {
+        if (!mapRef.current) return;
         const map = mapRef.current;
 
-        // Toggle Layers dynamically
         if (layers.fire) fireLayerGroupRef.current.addTo(map);
         else fireLayerGroupRef.current.remove();
 
         if (layers.flood) floodLayerGroupRef.current.addTo(map);
         else floodLayerGroupRef.current.remove();
-
     }, [layers]);
 
     // Handle Route updates
@@ -139,8 +195,6 @@ export default function MapComponent({ layers, routeStatus }) {
                 // Zoom map to bounds
                 map.fitBounds(L.latLngBounds(latLngs).pad(0.15));
             }
-        } else if (routeStatus.status === 'idle') {
-            // map.setView([39.15, 35.44], 6); // Reset zoom? Optional.
         }
         
     }, [routeStatus]);
