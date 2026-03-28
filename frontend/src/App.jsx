@@ -4,32 +4,36 @@ import Sidebar from './components/Sidebar';
 import RoutePanel from './components/RoutePanel';
 import MapComponent from './components/MapComponent';
 import Legend from './components/Legend';
-import NotificationBanner from './components/NotificationBanner';
-import { geocode, getRoute, calculateSafety } from './utils/routing';
+import StatusBar from './components/StatusBar';
+import { geocode, getAllRoutes } from './utils/routing';
 import { fetchFirePoints } from './services/api';
 import './index.css';
 
 function App() {
-    const [layers, setLayers] = useState({ fire: false, flood: false });
+    const [layers, setLayers] = useState({ fire: false });
     const [fromInput, setFromInput] = useState('');
     const [toInput, setToInput] = useState('');
 
-    // Yangın verisi — backend'den çekilir, App seviyesinde tutulur
+    // Yangın verisi — NASA FIRMS
     const [firePoints, setFirePoints] = useState([]);
     const [fireLoading, setFireLoading] = useState(false);
     const [fireError, setFireError] = useState(null);
+    const [lastFetchTime, setLastFetchTime] = useState(null);
 
-    // status: 'idle' | 'loading' | 'success' | 'error'
+    // Rota durumu
     const [routeStatus, setRouteStatus] = useState({ status: 'idle', payload: null, error: null });
 
+    // Seçili rota ID — kullanıcı panel veya harita üzerinden değiştirir
+    const [selectedRouteId, setSelectedRouteId] = useState('safe');
+
     const toggleLayer = useCallback(async (layerName) => {
-        // Yangın katmanı ilk kez açılıyorsa veriyi çek
         if (layerName === 'fire' && !layers.fire && firePoints.length === 0 && !fireLoading) {
             setFireLoading(true);
             setFireError(null);
             try {
                 const data = await fetchFirePoints();
                 setFirePoints(data);
+                setLastFetchTime(new Date());
             } catch (err) {
                 console.error('Yangın verisi alınamadı:', err);
                 setFireError(err.message);
@@ -50,37 +54,32 @@ function App() {
 
         try {
             const fromGeo = await geocode(fromInput.trim());
-            const toGeo = await geocode(toInput.trim());
+            const toGeo   = await geocode(toInput.trim());
 
             if (!fromGeo || !toGeo) {
                 setRouteStatus({ status: 'error', error: 'Konum bulunamadı. Lütfen geçerli bir şehir veya adres girin.', payload: null });
                 return;
             }
 
-            const routeObj = await getRoute(fromGeo, toGeo);
-            if (!routeObj) {
+            // Güvenli + tüm alternatif rotaları hesapla
+            const { routes, threats } = await getAllRoutes(fromGeo, toGeo, firePoints);
+
+            if (!routes.length) {
                 setRouteStatus({ status: 'error', error: 'Rota hesaplanamadı.', payload: null });
                 return;
             }
 
-            const routeCoords = routeObj.geometry.coordinates;
-            const distKm = (routeObj.distance / 1000).toFixed(1);
-            const durationMin = Math.round(routeObj.duration / 60);
-            const safetyScore = calculateSafety(routeCoords);
+            // En yüksek güvenlik skorlu rotayı varsayılan seç
+            const defaultId = routes.reduce(
+                (best, r) => r.safetyScore > (routes.find(x => x.id === best)?.safetyScore ?? 0) ? r.id : best,
+                routes[0].id
+            );
+            setSelectedRouteId(defaultId);
 
             setRouteStatus({
                 status: 'success',
                 error: null,
-                payload: {
-                    fromName: fromGeo.name,
-                    toName: toGeo.name,
-                    fromGeo,
-                    toGeo,
-                    routeObj,
-                    distanceKm: distKm,
-                    durationMin,
-                    safetyScore
-                }
+                payload: { fromName: fromGeo.name, toName: toGeo.name, fromGeo, toGeo, routes, threats },
             });
 
         } catch (err) {
@@ -93,31 +92,47 @@ function App() {
         setRouteStatus({ status: 'idle', payload: null, error: null });
         setFromInput('');
         setToInput('');
+        setSelectedRouteId('safe');
     };
+
+    const handleSelectRoute = useCallback((id) => {
+        setSelectedRouteId(id);
+    }, []);
 
     return (
         <div className="relative w-full h-screen overflow-hidden bg-background text-on-background">
-            <MapComponent layers={layers} routeStatus={routeStatus} firePoints={firePoints} />
-            <Header 
-                fromInput={fromInput} 
-                setFromInput={setFromInput} 
-                toInput={toInput} 
-                setToInput={setToInput} 
-                onCalculateRoute={handleCalculateRoute} 
+            <MapComponent
+                layers={layers}
+                routeStatus={routeStatus}
+                firePoints={firePoints}
+                selectedRouteId={selectedRouteId}
+                onSelectRoute={handleSelectRoute}
             />
-            <NotificationBanner />
+            <Header
+                fromInput={fromInput}
+                setFromInput={setFromInput}
+                toInput={toInput}
+                setToInput={setToInput}
+                onCalculateRoute={handleCalculateRoute}
+                routeStatus={routeStatus}
+            />
             <Sidebar
                 layers={layers}
                 toggleLayer={toggleLayer}
-                fireCount={firePoints.length}
+                firePoints={firePoints}
                 fireLoading={fireLoading}
                 fireError={fireError}
             />
-            <RoutePanel routeStatus={routeStatus} onClearRoute={handleClearRoute} />
+            <RoutePanel
+                routeStatus={routeStatus}
+                selectedRouteId={selectedRouteId}
+                onSelectRoute={handleSelectRoute}
+                onClearRoute={handleClearRoute}
+            />
             <Legend />
+            <StatusBar firePoints={firePoints} lastFetchTime={lastFetchTime} />
         </div>
     );
 }
 
 export default App;
-
