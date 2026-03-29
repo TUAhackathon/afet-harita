@@ -4,7 +4,7 @@
  */
 import { useState } from 'react';
 
-export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoading = false, fireError = null, lastFetchTime, isOpen, setIsOpen, region, onRegionChange }) {
+export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoading = false, fireError = null, lastFetchTime, isOpen, setIsOpen, region, onRegionChange, aiAnalysis = { status: 'idle', results: [] }, onRiskAnalysis }) {
 
     // Yangın istatistikleri (NASA FIRMS verisi)
     const redCount    = firePoints.filter(f => f.color === 'red').length;
@@ -237,17 +237,84 @@ export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoad
                         Rota Planlama
                     </button>
                     <button
-                        onClick={() => {
-                            // Yangın katmanını zorla aç (zaten açıksa elleme)
-                            if (!layers.fire) toggleLayer('fire');
-                        }}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400
+                        onClick={onRiskAnalysis}
+                        disabled={aiAnalysis.status === 'loading'}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400
                         hover:text-amber-400 bg-slate-900/40 hover:bg-amber-500/8
                         border border-slate-800/50 hover:border-amber-500/20
-                        transition-all cursor-pointer group text-xs font-semibold">
-                        <span className="material-symbols-outlined text-base text-slate-500 group-hover:text-amber-400 transition-colors">crisis_alert</span>
-                        Risk Analizi
+                        transition-all cursor-pointer group text-xs font-semibold
+                        disabled:opacity-60 disabled:cursor-not-allowed`}>
+                        {aiAnalysis.status === 'loading' ? (
+                            <span className="material-symbols-outlined text-base text-amber-400 animate-spin transition-colors">autorenew</span>
+                        ) : (
+                            <span className="material-symbols-outlined text-base text-slate-500 group-hover:text-amber-400 transition-colors">crisis_alert</span>
+                        )}
+                        {aiAnalysis.status === 'loading' ? 'Analiz Yapılıyor...' : 'Risk Analizi'}
                     </button>
+
+                    {/* ── AI Sonuç Paneli ────────────────────── */}
+                    {aiAnalysis.status === 'done' && aiAnalysis.results.length > 0 && (() => {
+                        const results = aiAnalysis.results;
+                        const kritikCount = results.filter(r => r.risk_seviyesi === 'Kritik').length;
+                        const avgFrp = (results.reduce((s, r) => s + r.frp_tahmin, 0) / results.length).toFixed(1);
+                        const maxFrp = Math.max(...results.map(r => r.frp_tahmin)).toFixed(1);
+
+                        return (
+                            <div className="mt-2 rounded-xl border border-amber-500/20 bg-amber-500/5 overflow-hidden">
+                                {/* Özet başlık */}
+                                <div className="px-4 py-3 border-b border-amber-500/15">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <span className="material-symbols-outlined text-sm text-amber-400" style={{ fontVariationSettings: "'FILL' 1" }}>smart_toy</span>
+                                        <span className="text-[9px] text-amber-400 font-black uppercase tracking-wider">AI Risk Analizi</span>
+                                        <span className="ml-auto text-[8px] text-slate-500">{results.length} nokta</span>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-1.5">
+                                        <div className="bg-slate-900/60 rounded-lg p-2 text-center">
+                                            <div className="text-sm font-black text-red-400">{kritikCount}</div>
+                                            <div className="text-[7px] text-slate-500 uppercase tracking-wide mt-0.5">Kritik</div>
+                                        </div>
+                                        <div className="bg-slate-900/60 rounded-lg p-2 text-center">
+                                            <div className="text-sm font-black text-amber-400">{avgFrp}</div>
+                                            <div className="text-[7px] text-slate-500 uppercase tracking-wide mt-0.5">Ort. MW</div>
+                                        </div>
+                                        <div className="bg-slate-900/60 rounded-lg p-2 text-center">
+                                            <div className="text-sm font-black text-orange-400">{maxFrp}</div>
+                                            <div className="text-[7px] text-slate-500 uppercase tracking-wide mt-0.5">Max MW</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Nokta listesi (en kritik 5) */}
+                                <div className="divide-y divide-slate-800/40">
+                                    {results.slice(0, 5).map((r, i) => {
+                                        const renkMap = {
+                                            'Kritik': 'text-red-400',
+                                            'Yüksek': 'text-orange-400',
+                                            'Orta':   'text-amber-400',
+                                            'Düşük':  'text-emerald-400',
+                                        };
+                                        return (
+                                            <div key={i} className="flex items-center gap-2.5 px-4 py-2">
+                                                <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${r.risk_seviyesi === 'Kritik' ? 'bg-red-400' : r.risk_seviyesi === 'Yüksek' ? 'bg-orange-400' : 'bg-amber-400'}`} />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="text-[9px] text-slate-400 truncate">
+                                                        {r.lat.toFixed(2)}°N {r.lon.toFixed(2)}°E
+                                                    </div>
+                                                    <div className={`text-[8px] font-bold ${renkMap[r.risk_seviyesi] || 'text-slate-400'}`}>
+                                                        {r.risk_seviyesi}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right shrink-0">
+                                                    <div className="text-[10px] font-black text-white">{r.frp_tahmin.toFixed(0)}</div>
+                                                    <div className="text-[7px] text-slate-500">MW</div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })()}
                 </div>
 
                 {/* ── Alt Bilgi ──────────────────────────── */}

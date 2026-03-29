@@ -7,7 +7,7 @@ import Legend from './components/Legend';
 import StatusBar from './components/StatusBar';
 import Toast from './components/Toast';
 import { geocode, getAllRoutes } from './utils/routing';
-import { fetchFirePoints } from './services/api';
+import { fetchFirePoints, runAiRiskAnalysis } from './services/api';
 import './index.css';
 
 function App() {
@@ -40,8 +40,31 @@ function App() {
     // Bildirim durumu
     const [toast, setToast] = useState(null);
 
+    // AI Risk Analizi durumu
+    const [aiAnalysis, setAiAnalysis] = useState({ status: 'idle', results: [], error: null });
+
     const showToast = (message, type = 'info') => {
         setToast({ message, type });
+    };
+
+    const handleRiskAnalysis = async () => {
+        if (firePoints.length === 0) {
+            showToast('Önce Yangın Risk katmanını aktif edin.', 'info');
+            return;
+        }
+        setAiAnalysis({ status: 'loading', results: [], error: null });
+        try {
+            const results = await runAiRiskAnalysis(firePoints);
+            if (results.length === 0) {
+                showToast('Analiz edilecek yüksek riskli nokta bulunamadı.', 'info');
+                setAiAnalysis({ status: 'idle', results: [], error: null });
+            } else {
+                setAiAnalysis({ status: 'done', results, error: null });
+            }
+        } catch (err) {
+            setAiAnalysis({ status: 'idle', results: [], error: 'AI analizi başarısız.' });
+            showToast('AI analizi sırasında hata oluştu.', 'error');
+        }
     };
 
     const toggleLayer = useCallback(async (layerName) => {
@@ -157,6 +180,8 @@ function App() {
                 setIsOpen={setIsSidebarOpen}
                 region={region}
                 onRegionChange={handleRegionChange}
+                aiAnalysis={aiAnalysis}
+                onRiskAnalysis={handleRiskAnalysis}
             />
             <RoutePanel
                 routeStatus={routeStatus}
