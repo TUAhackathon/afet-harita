@@ -24,6 +24,8 @@ function App() {
 
     // Seçili rota ID — kullanıcı panel veya harita üzerinden değiştirir
     const [selectedRouteId, setSelectedRouteId] = useState('safe');
+    // Sidebar açık kapalı durumu
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     const toggleLayer = useCallback(async (layerName) => {
         const nextState = !layers[layerName];
@@ -128,6 +130,8 @@ function App() {
                 firePoints={firePoints}
                 fireLoading={fireLoading}
                 fireError={fireError}
+                isOpen={isSidebarOpen}
+                setIsOpen={setIsSidebarOpen}
             />
             <RoutePanel
                 routeStatus={routeStatus}
@@ -135,7 +139,7 @@ function App() {
                 onSelectRoute={handleSelectRoute}
                 onClearRoute={handleClearRoute}
             />
-            <Legend />
+            <Legend isSidebarOpen={isSidebarOpen} />
         </div>
     );
 }

@@ -1,7 +1,7 @@
 /**
  * Legend.jsx — Güncellendi: Çok rota + yangın seviyeleri
  */
-export default function Legend() {
+export default function Legend({ isSidebarOpen = true }) {
     const items = [
         { type: 'dot',  color: '#3fff8b', shadow: '0 0 8px #3fff8b', label: 'Güvenli Rota' },
         { type: 'dot',  color: '#94a3b8', shadow: '',                 label: 'Doğrudan Rota', dash: true },
@@ -13,7 +13,9 @@ export default function Legend() {
     ];
 
     return (
-        <div className="fixed bottom-14 left-[310px] z-40 pointer-events-none">
+        <div className={`fixed bottom-14 z-40 pointer-events-none transition-all duration-500 ease-in-out ${
+            isSidebarOpen ? 'left-[310px]' : 'left-8'
+        }`}>
             <div className="bg-slate-950/88 backdrop-blur-xl px-4 py-3 rounded-xl border border-white/5 shadow-xl">
                 <div className="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2.5">
                     Harita Lejantı

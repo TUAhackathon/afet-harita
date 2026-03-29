@@ -4,8 +4,7 @@
  */
 import { useState } from 'react';
 
-export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoading = false, fireError = null }) {
-    const [isOpen, setIsOpen] = useState(true);
+export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoading = false, fireError = null, isOpen, setIsOpen }) {
 
     // Yangın istatistikleri (NASA FIRMS verisi)
     const redCount    = firePoints.filter(f => f.color === 'red').length;
