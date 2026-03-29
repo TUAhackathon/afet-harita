@@ -317,15 +317,7 @@ export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoad
                     })()}
                 </div>
 
-                {/* ── Alt Bilgi ──────────────────────────── */}
-                <div className="mt-auto pt-6 shrink-0">
-                    <div className="h-px bg-gradient-to-r from-transparent via-slate-700/50 to-transparent mb-4" />
-                    <a href="#" className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-500
-                        hover:text-slate-300 hover:bg-slate-800/40 transition-all text-xs font-medium">
-                        <span className="material-symbols-outlined text-base">settings</span>
-                        Sistem Ayarları
-                    </a>
-                </div>
+
             </div>
         </aside>
     );
