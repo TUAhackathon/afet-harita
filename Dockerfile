@@ -1,7 +1,7 @@
 # ==========================================
 # STAGE 1: Frontend Build (Vite/React)
 # ==========================================
-FROM node:18-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 
 # Uyarıları ve gereksiz logları azaltmak için ortam değişkenleri
