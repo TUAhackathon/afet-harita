@@ -153,6 +153,8 @@ export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoad
                                         <span className={layers.fire ? 'text-orange-400 font-bold' : ''}>
                                             {totalCount} aktif nokta tespit edildi
                                         </span>
+                                    ) : layers.fire ? (
+                                        <span className="text-slate-400">Aktif risk bulunamadı</span>
                                     ) : (
                                         <span>Aktivasyon için tıklayın</span>
                                     )}
@@ -189,14 +191,25 @@ export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoad
                     <div className="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em] mb-2">
                         Operasyon
                     </div>
-                    <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400
+                    <button
+                        onClick={() => {
+                            // Menüyü kapat ve odaklan
+                            setIsOpen(false);
+                            setTimeout(() => document.getElementById('input-from')?.focus(), 500);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400
                         hover:text-emerald-400 bg-slate-900/40 hover:bg-emerald-500/8
                         border border-slate-800/50 hover:border-emerald-500/20
                         transition-all cursor-pointer group text-xs font-semibold">
                         <span className="material-symbols-outlined text-base text-slate-500 group-hover:text-emerald-400 transition-colors">route</span>
                         Rota Planlama
                     </button>
-                    <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400
+                    <button
+                        onClick={() => {
+                            // Yangın katmanını zorla aç (zaten açıksa elleme)
+                            if (!layers.fire) toggleLayer('fire');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400
                         hover:text-amber-400 bg-slate-900/40 hover:bg-amber-500/8
                         border border-slate-800/50 hover:border-amber-500/20
                         transition-all cursor-pointer group text-xs font-semibold">
