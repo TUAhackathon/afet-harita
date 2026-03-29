@@ -25,17 +25,10 @@ export default function StatusBar({ firePoints = [], lastFetchTime }) {
                     <span className="text-[9px] text-emerald-400 font-black uppercase tracking-widest">NASA FIRMS</span>
                 </div>
 
-<<<<<<< HEAD
                 {total > 0 ? (
                     <>
                         <div className="w-px h-4 bg-slate-700" />
                         
-=======
-                {total > 0 && (
-                    <>
-                        <div className="w-px h-4 bg-slate-700" />
-
->>>>>>> origin/main
                         {/* Yangın sayımı */}
                         <div className="flex items-center gap-2.5">
                             {redCount > 0 && (
@@ -56,7 +49,6 @@ export default function StatusBar({ firePoints = [], lastFetchTime }) {
                                     <span className="text-[9px] text-green-400 font-bold">{greenCount}</span>
                                 </div>
                             )}
-<<<<<<< HEAD
                             <span className="text-[9px] text-slate-500 font-bold uppercase tracking-wider">= {total} Yangın</span>
                         </div>
                     </>
@@ -65,9 +57,6 @@ export default function StatusBar({ firePoints = [], lastFetchTime }) {
                         <div className="w-px h-4 bg-slate-700" />
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-amber-500 font-bold uppercase tracking-tight">Aktif yangın kaydı bulunmamaktadır</span>
-=======
-                            <span className="text-[9px] text-slate-500 font-medium">= {total} nokta</span>
->>>>>>> origin/main
                         </div>
                     </>
                 )}
