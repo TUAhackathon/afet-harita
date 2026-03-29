@@ -9,6 +9,7 @@
  */
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
+import { fetchAiPredictionForPoint } from '../services/api';
 
     export default function MapComponent({ layers, routeStatus, firePoints = [], selectedRouteId, onSelectRoute, region = 'tr' }) {
     const mapRef              = useRef(null);
@@ -86,8 +87,18 @@ import L from 'leaflet';
                 color: colors.border, fillColor: colors.fill, fillOpacity: 0.75, weight: 2,
             });
             
-            const popupHtml = `<div style="font-family:Inter,sans-serif;min-width:170px;padding:4px 0">
+            const pointId = `ai-pt-${Math.random().toString(36).substring(2, 9)}`;
+
+            const popupHtml = `<div style="font-family:Inter,sans-serif;min-width:180px;padding:4px 0">
                     <div style="font-weight:800;font-size:13px;margin-bottom:6px;color:#1a1a2e">${point.level}</div>
+                    
+                    <div id="${pointId}" style="margin-bottom:8px;padding:6px;background:#fffbeb;border:1px solid #fcd34d;border-radius:6px;box-shadow:0 1px 2px rgba(0,0,0,0.05)">
+                        <div style="display:flex;align-items:center;gap:4px;color:#d97706;font-size:10px;font-weight:700;">
+                            <span class="material-symbols-outlined animate-spin" style="font-size:12px">autorenew</span>
+                            AI Modeli Hesaplanıyor...
+                        </div>
+                    </div>
+
                     <div style="font-size:11px;color:#555;margin-bottom:2px">🌡 Brightness: <b>${point.brightness.toFixed(1)} K</b></div>
                     <div style="font-size:11px;color:#555;margin-bottom:2px">📍 ${point.lat.toFixed(4)}°N, ${point.lon.toFixed(4)}°E</div>
                     
@@ -104,7 +115,42 @@ import L from 'leaflet';
                     <div style="font-size:10px;color:#888;margin-top:4px;border-top:1px solid #eee;padding-top:4px">Kaynak: NASA & OWM</div>
                 </div>`;
 
+            const handlePopupOpen = async () => {
+                const el = document.getElementById(pointId);
+                if (!el || el.dataset.loaded) return;
+                
+                try {
+                    const aiResult = await fetchAiPredictionForPoint(point);
+                    if (!document.getElementById(pointId)) return; // Kapanmış olabilir
+                    
+                    const colorMap = { 'Kritik': '#ef4444', 'Yüksek': '#f97316', 'Orta': '#f59e0b', 'Düşük': '#22c55e' };
+                    const color = colorMap[aiResult.risk_seviyesi] || '#64748b';
+                    
+                    el.style.background = '#f8fafc';
+                    el.style.borderColor = '#e2e8f0';
+                    el.dataset.loaded = 'true';
+                    el.innerHTML = `
+                        <div style="display:flex;align-items:center;justify-content:space-between">
+                            <div>
+                                <div style="font-size:8px;text-transform:uppercase;font-weight:800;color:#94a3b8;letter-spacing:0.05em;margin-bottom:1px">Yapay Zeka Tahmini</div>
+                                <div style="font-weight:900;font-size:15px;color:${color}">${aiResult.frp_tahmin.toFixed(0)} <span style="font-size:10px;color:#64748b">MW</span></div>
+                            </div>
+                            <div style="text-align:right">
+                                <div style="font-size:9px;font-weight:800;padding:3px 6px;border-radius:4px;color:white;background:${color};box-shadow:0 1px 2px rgba(0,0,0,0.1)">${aiResult.risk_seviyesi}</div>
+                            </div>
+                        </div>
+                    `;
+                } catch (err) {
+                    if (document.getElementById(pointId)) {
+                        el.innerHTML = '<div style="color:#ef4444;font-size:10px;font-weight:600">AI Bağlantı Hatası</div>';
+                        el.style.background = '#fee2e2';
+                        el.style.borderColor = '#f87171';
+                    }
+                }
+            };
+
             circle.bindPopup(popupHtml);
+            circle.on('popupopen', handlePopupOpen);
             fireGroup.addLayer(circle);
 
             // 🔥 İkon marker
@@ -116,6 +162,7 @@ import L from 'leaflet';
                 }),
             });
             iconMarker.bindPopup(popupHtml);
+            iconMarker.on('popupopen', handlePopupOpen);
             fireGroup.addLayer(iconMarker);
 
             // 💨 Rüzgar Vektörü (Ok) — Eğer veri varsa

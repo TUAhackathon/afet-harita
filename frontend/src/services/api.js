@@ -85,3 +85,37 @@ export async function runAiRiskAnalysis(firePoints) {
         .map(r => r.value)
         .sort((a, b) => b.frp_tahmin - a.frp_tahmin); // En yüksek FRP üste
 }
+
+/**
+ * Tek bir nokta için anlık AI tahmini alır (Popup/Hover için)
+ * @param {Object} point - Tek bir yangın noktası nesnesi
+ */
+export async function fetchAiPredictionForPoint(point) {
+    const today = new Date().toISOString().split('T')[0];
+    const hhmm = new Date().getHours() * 100 + new Date().getMinutes();
+
+    const payload = {
+        latitude:   point.lat,
+        longitude:  point.lon,
+        brightness: point.brightness,
+        bright_t31: Math.max(200, point.brightness - 45),
+        scan:       1.0,
+        track:      1.0,
+        confidence: point.color === 'red' ? 'high' : 'nominal',
+        daynight:   new Date().getHours() >= 6 && new Date().getHours() < 20 ? 'D' : 'N',
+        acq_date:   today,
+        acq_time:   hhmm,
+    };
+
+    const res = await fetch(`${API_BASE}/ai/predict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+        throw new Error('AI Tahmini başarısız: ' + res.status);
+    }
+    
+    return await res.json();
+}
