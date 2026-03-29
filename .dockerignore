@@ -1,0 +1,33 @@
+# Node
+node_modules
+dist
+build
+npm-debug.log
+.DS_Store
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+.env
+
+# Git
+.git
+.gitignore
+
+# IDEs and Tools
+.vscode
+.idea
+*.swp
+*.swo
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml

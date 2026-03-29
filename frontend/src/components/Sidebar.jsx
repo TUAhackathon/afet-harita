@@ -62,13 +62,10 @@ export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoad
                             COMMAND CENTER
                         </h2>
                         <p className="text-[9px] text-slate-500 uppercase tracking-widest font-semibold mt-0.5">
-                            BKZS — Taktik Ağ
+                            Afet Harita Sistemi
                         </p>
                     </div>
-                    <div className="ml-auto flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#3fff8b]" />
-                        <span className="text-[8px] text-emerald-500 font-bold uppercase tracking-wider">ONLINE</span>
-                    </div>
+
                 </div>
 
                 {/* ── Tehdit Seviyesi ────────────────────── */}
