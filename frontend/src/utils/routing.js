@@ -9,19 +9,27 @@ import L from 'leaflet';
 
 /* ─── Geocoding ─────────────────────────────────────────────── */
 export async function geocode(placeName) {
-    // Türkiye ve Hindistan'da arama yap
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(placeName)}&countrycodes=tr,in&limit=1`;
+    // Sadece Türkiye'de arama yap
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(placeName)}&countrycodes=tr&limit=1`;
     try {
         const res = await fetch(url, { headers: { 'Accept-Language': 'tr' } });
         if (!res.ok) throw new Error(`Geocoding HTTP ${res.status}`);
         const data = await res.json();
         if (!data.length) return null;
-        return {
-            lat: parseFloat(data[0].lat),
-            lng: parseFloat(data[0].lon),
-            name: data[0].display_name.split(',')[0],
-        };
+        
+        const lat = parseFloat(data[0].lat);
+        const lng = parseFloat(data[0].lon);
+        const name = data[0].display_name.split(',')[0];
+        
+        // Bounding Box (Sınır Kutusu) Testi (Yaklaşık TR sınırları)
+        if (lat < 35.8 || lat > 42.2 || lng < 25.6 || lng > 44.8) {
+            throw new Error(`"${name}" Türkiye sınırları dışında! Lütfen yurtiçi bir konum girin.`);
+        }
+
+        return { lat, lng, name };
     } catch (err) {
+        // Özel Bounding Box fırlatmasını doğrudan ilet
+        if (err.message.includes('sınırları dışında')) throw err;
         throw new Error(`Konum arama hizmetine ulaşılamadı. İnternet bağlantınızı kontrol edin.`);
     }
 }
@@ -184,25 +192,41 @@ export function calculateSafety(routeCoords, liveFirePoints = []) {
     if (!routeCoords?.length)    return 97;  // NaN guard: koordinat yoksa güvenli say
 
     let weightedDanger = 0;
+    let maxDangerLevelHit = 0; // 0: Hiçbiri, 1: Yeşil, 2: Sarı, 3: Kırmızı
     const totalPoints  = routeCoords.length;
 
     routeCoords.forEach(coord => {
         liveFirePoints.forEach(fp => {
             const dist   = L.latLng(coord[1], coord[0]).distanceTo(L.latLng(fp.lat, fp.lon));
             const radius = fp.color === 'red' ? 28000 : fp.color === 'yellow' ? 20000 : 12000;
+            
             if (dist < radius) {
                 const weight = fp.color === 'red' ? 3 : fp.color === 'yellow' ? 2 : 1;
                 weightedDanger += weight * (1 - dist / radius);
+                
+                // Rotanın girdiği en şiddetli tehlike çemberini işaretle
+                if (fp.color === 'red') maxDangerLevelHit = 3;
+                else if (fp.color === 'yellow' && maxDangerLevelHit < 2) maxDangerLevelHit = 2;
+                else if (fp.color === 'green' && maxDangerLevelHit < 1) maxDangerLevelHit = 1;
             }
         });
     });
 
     // totalPoints veya liveFirePoints.length sıfır olamaz (yukarıda guard'landı)
     const dangerRatio = weightedDanger / (totalPoints * liveFirePoints.length * 3);
-    const score = Math.round(100 - dangerRatio * 350);
+    
+    // Normal puan (eski oranla biraz daha agresif)
+    let score = Math.round(100 - dangerRatio * 500);
+    
+    // Ağır Risk Tavan (Kırmızıya girerse %35'i geçemez, Sarıya girerse %65'i geçemez)
+    if (maxDangerLevelHit === 3) score = Math.min(score, 35);
+    else if (maxDangerLevelHit === 2) score = Math.min(score, 65);
+    else if (maxDangerLevelHit === 1) score = Math.min(score, 85);
+    else if (score < 97 && maxDangerLevelHit === 0) score = 97; // Tehlikeye hiç girmediyse
+
     // NaN veya Infinity koruması
     if (!isFinite(score)) return 97;
-    return Math.max(15, Math.min(100, score));
+    return Math.max(10, Math.min(100, score));
 }
 
 /* ─── Ana Fonksiyon: Tüm Alternatifleri Hesapla ─────────────── */

@@ -135,7 +135,11 @@ function App() {
 
         } catch (err) {
             console.error(err);
-            setRouteStatus({ status: 'error', error: 'Bağlantı hatası. Lütfen tekrar deneyin.', payload: null });
+            // Eğer geocode'dan gelen özel bir hata mesajıysa onu göster, değilse genel bağlantı hatası yaz
+            const errorMessage = err.message.includes('Türkiye sınırları dışında') 
+                ? err.message 
+                : 'Bağlantı hatası veya rota bulunamadı. Lütfen tekrar deneyin.';
+            setRouteStatus({ status: 'error', error: errorMessage, payload: null });
         }
     };
 
