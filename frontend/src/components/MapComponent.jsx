@@ -1,95 +1,87 @@
+/**
+ * MapComponent.jsx — Çok Rota Destekli Harita + Meteoroloji Birleşimi
+ *
+ * Özellikler:
+ * - Seçili rota: parlak + tam opak
+ * - Diğer rotalar: soluk + kesik çizgi
+ * - Yangın tampon bölgeleri (Danger Buffers)
+ * - Rüzgar Vektörleri (Anlık Meteoroloji Okları)
+ */
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
-import { floodData } from '../utils/data';
 
-export default function MapComponent({ layers, routeStatus, firePoints = [] }) {
-    const mapRef = useRef(null);
-    const fireLayerGroupRef = useRef(L.layerGroup());
-    const floodLayerGroupRef = useRef(L.layerGroup());
-    const routeLayerGroupRef = useRef(L.layerGroup());
+export default function MapComponent({ layers, routeStatus, firePoints = [], selectedRouteId, onSelectRoute }) {
+    const mapRef              = useRef(null);
+    const fireLayerGroupRef   = useRef(L.layerGroup());
+    const bufferLayerGroupRef = useRef(L.layerGroup());
+    const routeLayerGroupRef  = useRef(L.layerGroup());
 
+    /* ─── Harita Başlatma ──────────────────────── */
     useEffect(() => {
         if (!mapRef.current) {
-            // Initialize main map centered on Turkey
             const map = L.map('map-container', {
                 zoomControl: false,
-                attributionControl: true
+                attributionControl: true,
             }).setView([39.15, 35.44], 6);
 
-            // Base Map Layer
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-                attribution: '&copy; OpenStreetMap &copy; CARTO'
+                attribution: '&copy; OpenStreetMap &copy; CARTO',
             }).addTo(map);
 
-            // Red roads overlay
             map.createPane('roadsPane');
             map.getPane('roadsPane').style.zIndex = 350;
             map.getPane('roadsPane').classList.add('leaflet-roads-pane');
-
             L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_toner_lines/{z}/{x}/{y}{r}.png', {
-                pane: 'roadsPane',
-                opacity: 0.7,
-                attribution: ''
+                pane: 'roadsPane', opacity: 0.65,
             }).addTo(map);
 
-            // Labels Layer
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
-                attribution: ''
-            }).addTo(map);
-
-            // Zoom Control
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png').addTo(map);
             L.control.zoom({ position: 'bottomright' }).addTo(map);
 
             mapRef.current = map;
-
-            // Generate Flood Markers (static data)
-            floodData.forEach(d => {
-                const circle = L.circle(d.coords, {
-                    color: '#1e90ff', fillColor: '#4dabff', fillOpacity: 0.3, weight: 2, radius: d.radius
-                });
-                const marker = L.marker(d.coords, {
-                    icon: L.divIcon({
-                        className: 'custom-marker',
-                        html: `<div class="flex flex-col items-center"><span class="material-symbols-outlined text-blue-500 bg-white/90 rounded-full p-1 shadow-lg" style="font-variation-settings: 'FILL' 1; font-size: 18px;">water</span><div class="text-[8px] font-bold mt-1 bg-white/90 px-2 rounded text-gray-800 whitespace-nowrap">${d.name}</div></div>`,
-                        iconSize: [30, 30],
-                        iconAnchor: [15, 15]
-                    })
-                });
-                floodLayerGroupRef.current.addLayer(circle);
-                floodLayerGroupRef.current.addLayer(marker);
-            });
-            
-            // Add route layer to map
             routeLayerGroupRef.current.addTo(map);
         }
     }, []);
 
-    // Update fire markers when firePoints prop changes
+    /* ─── Yangın Noktaları + Tampon Daireler + Rüzgar Vektörleri ──── */
     useEffect(() => {
         if (!mapRef.current) return;
-        const fireGroup = fireLayerGroupRef.current;
+        const fireGroup   = fireLayerGroupRef.current;
+        const bufferGroup = bufferLayerGroupRef.current;
         fireGroup.clearLayers();
+        bufferGroup.clearLayers();
+
+        if (!firePoints.length) return;
+
+        const colorMap = {
+            green:  { border: '#22c55e', fill: '#4ade80' },
+            yellow: { border: '#eab308', fill: '#facc15' },
+            red:    { border: '#ff4500', fill: '#ff6b35' },
+            gray:   { border: '#9ca3af', fill: '#d1d5db' },
+        };
+        const iconClass = {
+            green: 'text-green-500', yellow: 'text-yellow-500',
+            red: 'text-orange-500',  gray: 'text-gray-400',
+        };
 
         firePoints.forEach(point => {
-            const colorMap = {
-                green: { border: '#22c55e', fill: '#4ade80' },
-                yellow: { border: '#eab308', fill: '#facc15' },
-                red: { border: '#ff4500', fill: '#ff6b35' },
-                gray: { border: '#9ca3af', fill: '#d1d5db' },
-            };
             const colors = colorMap[point.color] || colorMap.gray;
-            const iconClass = {
-                green: 'text-green-500',
-                yellow: 'text-yellow-500',
-                red: 'text-orange-500',
-                gray: 'text-gray-400',
-            };
+            const dangerRadius = point.color === 'red' ? 28000 : point.color === 'yellow' ? 20000 : 12000;
 
-            // Nokta marker
+            // ⭕ Tehlike tampon dairesi
+            bufferGroup.addLayer(L.circle([point.lat, point.lon], {
+                radius: dangerRadius, weight: 1, dashArray: '4 6',
+                color:       point.color === 'red' ? '#ff4500' : point.color === 'yellow' ? '#eab308' : '#22c55e',
+                fillColor:   point.color === 'red' ? '#ff4500' : point.color === 'yellow' ? '#eab308' : '#22c55e',
+                fillOpacity: 0.07, opacity: 0.45,
+            }));
+
+            // 📍 Nokta marker
             const circle = L.circleMarker([point.lat, point.lon], {
                 radius: point.color === 'red' ? 8 : point.color === 'yellow' ? 6 : 4,
                 color: colors.border, fillColor: colors.fill, fillOpacity: 0.75, weight: 2,
             });
+            
             circle.bindPopup(
                 `<div style="font-family:Inter,sans-serif;min-width:170px;padding:4px 0">
                     <div style="font-weight:800;font-size:13px;margin-bottom:6px;color:#1a1a2e">${point.level}</div>
@@ -107,7 +99,7 @@ export default function MapComponent({ layers, routeStatus, firePoints = [] }) {
             );
             fireGroup.addLayer(circle);
 
-            // İkon marker
+            // 🔥 İkon marker
             fireGroup.addLayer(L.marker([point.lat, point.lon], {
                 icon: L.divIcon({
                     className: 'custom-marker',
@@ -141,69 +133,112 @@ export default function MapComponent({ layers, routeStatus, firePoints = [] }) {
         if (!mapRef.current) return;
         const map = mapRef.current;
 
-        if (layers.fire) fireLayerGroupRef.current.addTo(map);
-        else fireLayerGroupRef.current.remove();
-
-        if (layers.flood) floodLayerGroupRef.current.addTo(map);
-        else floodLayerGroupRef.current.remove();
+        if (layers.fire) {
+            if (!map.hasLayer(fireLayerGroupRef.current))   fireLayerGroupRef.current.addTo(map);
+            if (!map.hasLayer(bufferLayerGroupRef.current)) bufferLayerGroupRef.current.addTo(map);
+        } else {
+            if (map.hasLayer(fireLayerGroupRef.current))   fireLayerGroupRef.current.remove();
+            if (map.hasLayer(bufferLayerGroupRef.current)) bufferLayerGroupRef.current.remove();
+        }
     }, [layers]);
 
-    // Handle Route updates
+    /* ─── Çok Rota Görselleştirme ──────────────── */
     useEffect(() => {
         if (!mapRef.current) return;
-        const map = mapRef.current;
         const rLayer = routeLayerGroupRef.current;
-
         rLayer.clearLayers();
 
-        if (routeStatus.status === 'success' && routeStatus.payload) {
-            const { routeObj, fromGeo, toGeo } = routeStatus.payload;
-            
-            if (routeObj && routeObj.geometry && routeObj.geometry.coordinates) {
-                const coords = routeObj.geometry.coordinates;
-                const latLngs = coords.map(c => [c[1], c[0]]);
-                
-                // Polyline shadow
+        if (routeStatus.status !== 'success' || !routeStatus.payload) return;
+
+        const { routes, fromGeo, toGeo } = routeStatus.payload;
+        if (!routes?.length) return;
+
+        // Seçili olmayan rotaları önce çiz (altda kalırlar)
+        const drawOrder = [
+            ...routes.filter(r => r.id !== selectedRouteId),
+            ...routes.filter(r => r.id === selectedRouteId),
+        ];
+
+        drawOrder.forEach(route => {
+            if (!route?.route?.geometry?.coordinates) return;
+
+            const isSelected = route.id === selectedRouteId;
+            const latLngs = route.route.geometry.coordinates.map(c => [c[1], c[0]]);
+
+            // Shadow sadece seçilene
+            if (isSelected) {
                 rLayer.addLayer(L.polyline(latLngs, {
-                    color: '#000000', weight: 8, opacity: 0.3
+                    color: '#000', weight: 12, opacity: 0.12,
+                    lineCap: 'round', lineJoin: 'round',
                 }));
-
-                // Main Polyline
-                rLayer.addLayer(L.polyline(latLngs, {
-                    color: '#3fff8b', weight: 5, opacity: 0.9, lineCap: 'round', lineJoin: 'round'
-                }));
-
-                // Start Marker
-                rLayer.addLayer(L.marker([fromGeo.lat, fromGeo.lng], {
-                    icon: L.divIcon({
-                        className: 'custom-marker',
-                        html: `<div class="flex flex-col items-center"><span class="material-symbols-outlined text-emerald-500 bg-white rounded-full p-1.5 shadow-lg" style="font-variation-settings: 'FILL' 1; font-size: 20px;">my_location</span><div class="text-[8px] font-bold mt-1 bg-white px-2 py-0.5 rounded shadow text-gray-800 whitespace-nowrap">${fromGeo.name}</div></div>`,
-                        iconSize: [40, 50],
-                        iconAnchor: [20, 25]
-                    })
-                }));
-
-                // End Marker
-                rLayer.addLayer(L.marker([toGeo.lat, toGeo.lng], {
-                    icon: L.divIcon({
-                        className: 'custom-marker',
-                        html: `<div class="flex flex-col items-center"><span class="material-symbols-outlined text-red-500 bg-white rounded-full p-1.5 shadow-lg" style="font-variation-settings: 'FILL' 1; font-size: 20px;">location_on</span><div class="text-[8px] font-bold mt-1 bg-white px-2 py-0.5 rounded shadow text-gray-800 whitespace-nowrap">${toGeo.name}</div></div>`,
-                        iconSize: [40, 50],
-                        iconAnchor: [20, 25]
-                    })
-                }));
-
-                // Zoom map to bounds
-                map.fitBounds(L.latLngBounds(latLngs).pad(0.15));
             }
+
+            // Ana çizgi
+            const polyline = L.polyline(latLngs, {
+                color:     isSelected ? route.color : '#64748b',
+                weight:    isSelected ? 5 : 3,
+                opacity:   isSelected ? 0.95 : 0.28,
+                dashArray: isSelected ? null : '8 10',
+                lineCap:   'round',
+                lineJoin:  'round',
+            });
+
+            // Hover efekti
+            polyline.on('mouseover', () => {
+                if (!isSelected) polyline.setStyle({ opacity: 0.65, weight: 4, color: route.color });
+            });
+            polyline.on('mouseout', () => {
+                if (!isSelected) polyline.setStyle({ opacity: 0.28, weight: 3, color: '#64748b' });
+            });
+
+            // Tıklayarak seçim
+            polyline.on('click', () => {
+                if (onSelectRoute && !isSelected) onSelectRoute(route.id);
+            });
+
+            // Cursor ayarı
+            polyline.on('add', () => {
+                if (polyline._path) polyline._path.style.cursor = 'pointer';
+            });
+
+            rLayer.addLayer(polyline);
+        });
+
+        // Seçili rota için başlangıç/bitiş markerları
+        const selectedRoute = routes.find(r => r.id === selectedRouteId);
+        if (selectedRoute && fromGeo && toGeo) {
+            rLayer.addLayer(L.marker([fromGeo.lat, fromGeo.lng], {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div class="flex flex-col items-center">
+                        <span class="material-symbols-outlined text-emerald-500 bg-white rounded-full p-1.5 shadow-xl" style="font-variation-settings:'FILL' 1;font-size:22px">my_location</span>
+                        <div class="text-[8px] font-bold mt-1 bg-white px-2 py-0.5 rounded-full shadow text-gray-700 whitespace-nowrap border border-emerald-200">${fromGeo.name}</div>
+                    </div>`,
+                    iconSize: [44, 56], iconAnchor: [22, 28],
+                }),
+            }));
+
+            rLayer.addLayer(L.marker([toGeo.lat, toGeo.lng], {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: `<div class="flex flex-col items-center">
+                        <span class="material-symbols-outlined text-red-500 bg-white rounded-full p-1.5 shadow-xl" style="font-variation-settings:'FILL' 1;font-size:22px">location_on</span>
+                        <div class="text-[8px] font-bold mt-1 bg-white px-2 py-0.5 rounded-full shadow text-gray-700 whitespace-nowrap border border-red-200">${toGeo.name}</div>
+                    </div>`,
+                    iconSize: [44, 56], iconAnchor: [22, 28],
+                }),
+            }));
+
+            // Seçili rotaya sığdır
+            const latLngs = selectedRoute.route.geometry.coordinates.map(c => [c[1], c[0]]);
+            mapRef.current.fitBounds(L.latLngBounds(latLngs).pad(0.18));
         }
-        
-    }, [routeStatus]);
+    }, [routeStatus, selectedRouteId, onSelectRoute]);
 
     return (
         <>
-            <div id="map-container" className="fixed inset-0 z-0 w-full h-full"></div>
-            <div className="fixed inset-0 map-overlay pointer-events-none z-10 w-full h-full"></div>
+            <div id="map-container" className="fixed inset-0 z-0 w-full h-full" />
+            <div className="fixed inset-0 map-overlay pointer-events-none z-10 w-full h-full" />
         </>
     );
 }

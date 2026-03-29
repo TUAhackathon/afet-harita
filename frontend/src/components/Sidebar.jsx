@@ -4,8 +4,7 @@
  */
 import { useState } from 'react';
 
-export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoading = false, fireError = null, lastFetchTime }) {
-    const [isOpen, setIsOpen] = useState(true);
+export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoading = false, fireError = null, lastFetchTime, isOpen, setIsOpen }) {
 
     // Yangın istatistikleri (NASA FIRMS verisi)
     const redCount    = firePoints.filter(f => f.color === 'red').length;
@@ -30,101 +29,204 @@ export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoad
         : 'bg-emerald-500/10 border-emerald-500/30';
 
     return (
-        <aside className="fixed left-0 top-0 bottom-0 z-[1000] w-72 flex flex-col p-6 bg-slate-950/80 backdrop-blur-2xl rounded-r-3xl h-[calc(100vh-2rem)] my-4 shadow-2xl shadow-black/50 overflow-y-auto">
-            <div className="text-emerald-400 font-bold uppercase text-xs mb-8 tracking-[0.2em]">COMMAND CENTER</div>
-            
-            <nav className="flex-1 space-y-2">
-                <button className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 font-medium tracking-wide transition-all cursor-pointer">
-                    <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>route</span>
-                    Rota Oluşturma
-                </button>
-                <button className="w-full flex items-center gap-4 px-4 py-3 rounded-xl text-slate-400 hover:text-amber-400 hover:bg-amber-500/10 font-medium tracking-wide transition-all cursor-pointer">
-                    <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>crisis_alert</span>
-                    Risk Analiz Bölgesi
-                </button>
-            </nav>
+        <aside className={`fixed left-0 top-0 bottom-0 z-[1000] w-[300px] flex flex-col
+            bg-slate-950/90 backdrop-blur-3xl rounded-r-[1.75rem]
+            h-[calc(100vh-1.5rem)] my-3 ml-0
+            shadow-[12px_0_40px_rgba(0,0,0,0.7)]
+            border-y border-r border-white/5
+            transition-transform duration-500 ease-in-out
+            ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}>
 
-            <div className="mt-8 pt-8 border-t border-outline-variant/10">
-                <div className="text-[10px] text-on-surface-variant uppercase tracking-widest mb-4">Afet Veri Katmanları</div>
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-slate-300">Satellite AI</span>
-                        <div className="w-8 h-4 bg-primary rounded-full relative shadow-[0_0_8px_rgba(63,255,139,0.4)]">
-                            <div className="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full"></div>
-                        </div>
+            {/* Toggle Butonu */}
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="absolute top-1/2 -right-9 w-9 h-14 bg-slate-950/95 rounded-r-xl
+                    flex items-center justify-center cursor-pointer shadow-xl
+                    border-y border-r border-white/5 hover:bg-slate-800
+                    transition-all z-[1001] group"
+                style={{ transform: 'translateY(-50%)' }}
+            >
+                <span className="material-symbols-outlined text-emerald-400 text-lg group-hover:scale-125 transition-transform duration-300">
+                    {isOpen ? 'chevron_left' : 'chevron_right'}
+                </span>
+            </button>
+
+            <div className="flex-1 flex flex-col p-5 overflow-y-auto overflow-x-hidden rounded-r-[1.75rem]">
+
+                {/* ── Başlık ─────────────────────────────── */}
+                <div className="flex items-center gap-3 mb-5 shrink-0">
+                    <div className="w-1.5 h-10 bg-gradient-to-b from-emerald-400 to-emerald-600 rounded-full shadow-[0_0_12px_rgba(16,185,129,0.6)]" />
+                    <div>
+                        <h2 className="text-emerald-400 font-black text-xs tracking-[0.25em] uppercase">
+                            COMMAND CENTER
+                        </h2>
+                        <p className="text-[9px] text-slate-500 uppercase tracking-widest font-semibold mt-0.5">
+                            BKZS — Taktik Ağ
+                        </p>
                     </div>
-
-                    <div className="grid grid-cols-1 gap-3 mt-4">
-                        <button 
-                            onClick={() => toggleLayer('fire')}
-                            className={`layer-toggle w-full text-left px-4 py-3 bg-surface-container-highest rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-between group cursor-pointer transition-all ${
-                                layers.fire 
-                                ? 'border-orange-500/50 border bg-orange-500/10 scale-[1.02]' 
-                                : 'hover:bg-orange-500/5'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className={`relative w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-                                    layers.fire ? 'bg-orange-500/20' : 'bg-slate-800/50'
-                                }`}>
-                                    <span
-                                        className={`material-symbols-outlined text-base transition-colors ${layers.fire ? 'text-orange-400' : 'text-slate-500 group-hover:text-orange-400'}`}
-                                        style={{ fontVariationSettings: "'FILL' 1" }}
-                                    >local_fire_department</span>
-                                    {layers.fire && (
-                                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
-                                    )}
-                                </div>
-                                <div>
-                                    <div className={`text-sm font-headline font-bold transition-colors ${
-                                        layers.fire ? 'text-orange-200' : 'text-slate-300'
-                                    }`}>Yangın Risk</div>
-                                    <div className="text-[8px] text-slate-500 font-normal normal-case tracking-normal mt-0.5">
-                                        {fireLoading ? (
-                                            <span className="text-orange-400 animate-pulse">NASA'dan çekiliyor...</span>
-                                        ) : fireError ? (
-                                            <span className="text-red-400">Bağlantı hatası</span>
-                                        ) : totalCount > 0 ? (
-                                            <span className={layers.fire ? 'text-orange-400 font-bold' : ''}>
-                                                {totalCount} aktif nokta tespit edildi
-                                            </span>
-                                        ) : lastFetchTime ? (
-                                            <span className="text-amber-500 font-bold italic tracking-tight">Şu anda aktif yangın bulunmamaktadır</span>
-                                        ) : (
-                                            <span>Aktivasyon için tıklayın</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            <div className={`w-3 h-3 rounded-full transition-all ${layers.fire ? 'bg-[#ff4500] shadow-[0_0_8px_#ff4500]' : 'bg-slate-600'}`}></div>
-                        </button>
-
-                        <button 
-                            onClick={() => toggleLayer('flood')}
-                            className={`layer-toggle w-full text-left px-4 py-3 bg-surface-container-highest rounded-xl text-xs font-bold uppercase tracking-tight flex items-center justify-between group cursor-pointer transition-all ${
-                                layers.flood 
-                                ? 'border-blue-500/50 border bg-blue-500/10 scale-[1.02]' 
-                                : 'hover:bg-blue-500/5'
-                            }`}
-                        >
-                            <div className="flex items-center gap-3">
-                                <span className="material-symbols-outlined text-blue-400" style={{ fontVariationSettings: "'FILL' 1" }}>water</span>
-                                <div>
-                                    <div className="text-sm font-headline text-slate-200">Sel</div>
-                                    <div className="text-[9px] text-slate-500 font-normal normal-case tracking-normal">Sel risk bölgelerini göster</div>
-                                </div>
-                            </div>
-                            <div className={`w-3 h-3 rounded-full transition-all ${layers.flood ? 'bg-[#1e90ff] shadow-[0_0_8px_#1e90ff]' : 'bg-slate-600'}`}></div>
-                        </button>
+                    <div className="ml-auto flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#3fff8b]" />
+                        <span className="text-[8px] text-emerald-500 font-bold uppercase tracking-wider">ONLINE</span>
                     </div>
                 </div>
-            </div>
 
-            <div className="mt-auto pt-6">
-                <a className="flex items-center gap-4 px-4 py-3 rounded-xl text-slate-500 hover:text-slate-200 hover:bg-white/5 font-medium tracking-wide transition-all" href="#">
-                    <span className="material-symbols-outlined">settings</span>
-                    Settings
-                </a>
+                {/* ── Tehdit Seviyesi ────────────────────── */}
+                {totalCount > 0 && (
+                    <div className={`flex items-center justify-between px-4 py-3 rounded-xl border mb-4 shrink-0 ${threatBg}`}>
+                        <div>
+                            <div className="text-[8px] text-slate-500 uppercase tracking-wider font-bold mb-0.5">
+                                Bölgesel Tehdit
+                            </div>
+                            <div className={`font-black text-sm tracking-widest ${threatColor}`}>
+                                {threatLevel}
+                            </div>
+                        </div>
+                        <span className={`material-symbols-outlined text-2xl ${threatColor}`}
+                            style={{ fontVariationSettings: "'FILL' 1" }}>crisis_alert</span>
+                    </div>
+                )}
+
+                {/* ── Yangın İstatistik Kartları ──────────── */}
+                {totalCount > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mb-4 shrink-0">
+                        <div className="bg-red-500/8 border border-red-500/20 rounded-xl p-3 text-center">
+                            <div className="text-2xl font-black text-red-400 leading-none">{redCount}</div>
+                            <div className="text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-1">Büyük</div>
+                        </div>
+                        <div className="bg-amber-500/8 border border-amber-500/20 rounded-xl p-3 text-center">
+                            <div className="text-2xl font-black text-amber-400 leading-none">{yellowCount}</div>
+                            <div className="text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-1">Orta</div>
+                        </div>
+                        <div className="bg-green-500/8 border border-green-500/20 rounded-xl p-3 text-center">
+                            <div className="text-2xl font-black text-green-400 leading-none">{greenCount}</div>
+                            <div className="text-[8px] text-slate-500 font-bold uppercase tracking-wider mt-1">Küçük</div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Ayraç ──────────────────────────────── */}
+                <div className="flex items-center gap-2 my-4 shrink-0 opacity-30">
+                    <div className="w-1.5 h-1.5 rounded-sm bg-emerald-500/50" />
+                    <div className="h-px bg-gradient-to-r from-emerald-500/50 to-transparent flex-1" />
+                </div>
+
+                {/* ── Uydu Katmanları ─────────────────────── */}
+                <div className="shrink-0">
+                    <div className="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em] mb-3">
+                        Uydu Katmanları
+                    </div>
+
+                    {/* Yangın Katmanı */}
+                    <button
+                        onClick={() => toggleLayer('fire')}
+                        className={`layer-toggle w-full text-left px-4 py-3.5 rounded-xl text-xs font-bold
+                            uppercase tracking-tight flex items-center justify-between
+                            group cursor-pointer transition-all border
+                            ${layers.fire
+                                ? 'border-orange-500/50 bg-orange-500/10 shadow-[inset_0_0_20px_rgba(249,115,22,0.1),0_0_15px_rgba(249,115,22,0.1)] scale-[1.01]'
+                                : 'border-slate-800/60 bg-slate-900/40 hover:border-orange-500/30 hover:bg-orange-500/5'
+                            }`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className={`relative w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
+                                layers.fire ? 'bg-orange-500/20' : 'bg-slate-800/50'
+                            }`}>
+                                <span
+                                    className={`material-symbols-outlined text-base transition-colors ${layers.fire ? 'text-orange-400' : 'text-slate-500 group-hover:text-orange-400'}`}
+                                    style={{ fontVariationSettings: "'FILL' 1" }}
+                                >local_fire_department</span>
+                                {layers.fire && (
+                                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-orange-400 rounded-full animate-pulse" />
+                                )}
+                            </div>
+                            <div>
+                                <div className={`text-sm font-headline font-bold transition-colors ${
+                                    layers.fire ? 'text-orange-200' : 'text-slate-300'
+                                }`}>Yangın Risk</div>
+                                <div className="text-[8px] text-slate-500 font-normal normal-case tracking-normal mt-0.5">
+                                    {fireLoading ? (
+                                        <span className="text-orange-400 animate-pulse">NASA'dan çekiliyor...</span>
+                                    ) : fireError ? (
+                                        <span className="text-red-400">Bağlantı hatası</span>
+                                    ) : totalCount > 0 ? (
+                                        <span className={layers.fire ? 'text-orange-400 font-bold' : ''}>
+                                            {totalCount} aktif nokta tespit edildi
+                                        </span>
+                                    ) : layers.fire ? (
+                                        <span className="text-slate-400">Aktif risk bulunamadı</span>
+                                    ) : (
+                                        <span>Aktivasyon için tıklayın</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        {/* Toggle indikatörü */}
+                        <div className={`w-10 h-5 rounded-full p-0.5 transition-all duration-300 relative shrink-0 ${
+                            layers.fire ? 'bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]' : 'bg-slate-700'
+                        }`}>
+                            <div className={`w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300 ${
+                                layers.fire ? 'translate-x-5' : 'translate-x-0'
+                            }`} />
+                        </div>
+                    </button>
+
+                    {/* NASA FIRMS Bilgisi */}
+                    {totalCount > 0 && (
+                        <div className="mt-3 px-4 py-3 rounded-xl bg-slate-900/50 border border-slate-800/60">
+                            <div className="flex items-center gap-2 mb-1.5">
+                                <span className="material-symbols-outlined text-sm text-blue-400">satellite_alt</span>
+                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Veri Kaynağı</span>
+                            </div>
+                            <p className="text-[9px] text-slate-500 leading-relaxed">
+                                NASA FIRMS — VIIRS NOAA-20 NRT<br/>
+                                <span className="text-emerald-500/70">60 saniye önbellek • Gerçek zamanlı</span>
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                {/* ── Navigasyon Araçları ─────────────────── */}
+                <div className="mt-4 space-y-2 shrink-0">
+                    <div className="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em] mb-2">
+                        Operasyon
+                    </div>
+                    <button
+                        onClick={() => {
+                            // Menüyü kapat ve odaklan
+                            setIsOpen(false);
+                            setTimeout(() => document.getElementById('input-from')?.focus(), 500);
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400
+                        hover:text-emerald-400 bg-slate-900/40 hover:bg-emerald-500/8
+                        border border-slate-800/50 hover:border-emerald-500/20
+                        transition-all cursor-pointer group text-xs font-semibold">
+                        <span className="material-symbols-outlined text-base text-slate-500 group-hover:text-emerald-400 transition-colors">route</span>
+                        Rota Planlama
+                    </button>
+                    <button
+                        onClick={() => {
+                            // Yangın katmanını zorla aç (zaten açıksa elleme)
+                            if (!layers.fire) toggleLayer('fire');
+                        }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400
+                        hover:text-amber-400 bg-slate-900/40 hover:bg-amber-500/8
+                        border border-slate-800/50 hover:border-amber-500/20
+                        transition-all cursor-pointer group text-xs font-semibold">
+                        <span className="material-symbols-outlined text-base text-slate-500 group-hover:text-amber-400 transition-colors">crisis_alert</span>
+                        Risk Analizi
+                    </button>
+                </div>
+
+                {/* ── Alt Bilgi ──────────────────────────── */}
+                <div className="mt-auto pt-6 shrink-0">
+                    <div className="h-px bg-gradient-to-r from-transparent via-slate-700/50 to-transparent mb-4" />
+                    <a href="#" className="flex items-center gap-3 px-4 py-2.5 rounded-xl text-slate-500
+                        hover:text-slate-300 hover:bg-slate-800/40 transition-all text-xs font-medium">
+                        <span className="material-symbols-outlined text-base">settings</span>
+                        Sistem Ayarları
+                    </a>
+                </div>
             </div>
         </aside>
     );

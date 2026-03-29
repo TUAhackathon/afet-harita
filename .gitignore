@@ -4,6 +4,7 @@ dist/
 .env
 
 # Python
+backend/venv/
 venv/
 .venv/
 __pycache__/
