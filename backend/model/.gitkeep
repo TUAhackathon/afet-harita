@@ -1,0 +1,4 @@
+# This directory should contain the .pkl files for the AI models.
+# - lgb_model.pkl
+# - lookup.pkl
+# - features.pkl

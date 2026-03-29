@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers.disasters import router as disasters_router
+from routers.ai import router as ai_router
 
 # .env dosyasından ortam değişkenlerini yükle
 load_dotenv()
@@ -41,6 +42,7 @@ app.add_middleware(
 
 # Router'ları ekle
 app.include_router(disasters_router)
+app.include_router(ai_router)
 
 
 import os

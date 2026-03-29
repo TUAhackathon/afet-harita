@@ -5,3 +5,7 @@ pandas
 python-dotenv
 
 aiofiles
+joblib
+lightgbm
+scikit-learn
+numpy
