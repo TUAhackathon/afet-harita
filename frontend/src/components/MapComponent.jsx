@@ -10,7 +10,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 
-export default function MapComponent({ layers, routeStatus, firePoints = [], selectedRouteId, onSelectRoute }) {
+    export default function MapComponent({ layers, routeStatus, firePoints = [], selectedRouteId, onSelectRoute, region = 'tr' }) {
     const mapRef              = useRef(null);
     const fireLayerGroupRef   = useRef(L.layerGroup());
     const bufferLayerGroupRef = useRef(L.layerGroup());
@@ -42,6 +42,17 @@ export default function MapComponent({ layers, routeStatus, firePoints = [], sel
             routeLayerGroupRef.current.addTo(map);
         }
     }, []);
+
+    /* ─── Bölge Navigasyonu ────────────────────── */
+    useEffect(() => {
+        if (!mapRef.current) return;
+        const map = mapRef.current;
+        if (region === 'tr') {
+            map.flyTo([39.15, 35.44], 6, { duration: 1.5 });
+        } else if (region === 'in') {
+            map.flyTo([22.5, 78.9], 5, { duration: 1.5 });
+        }
+    }, [region]);
 
     /* ─── Yangın Noktaları + Tampon Daireler + Rüzgar Vektörleri ──── */
     useEffect(() => {
@@ -82,8 +93,7 @@ export default function MapComponent({ layers, routeStatus, firePoints = [], sel
                 color: colors.border, fillColor: colors.fill, fillOpacity: 0.75, weight: 2,
             });
             
-            circle.bindPopup(
-                `<div style="font-family:Inter,sans-serif;min-width:170px;padding:4px 0">
+            const popupHtml = `<div style="font-family:Inter,sans-serif;min-width:170px;padding:4px 0">
                     <div style="font-weight:800;font-size:13px;margin-bottom:6px;color:#1a1a2e">${point.level}</div>
                     <div style="font-size:11px;color:#555;margin-bottom:2px">🌡 Brightness: <b>${point.brightness.toFixed(1)} K</b></div>
                     <div style="font-size:11px;color:#555;margin-bottom:2px">📍 ${point.lat.toFixed(4)}°N, ${point.lon.toFixed(4)}°E</div>
@@ -92,21 +102,28 @@ export default function MapComponent({ layers, routeStatus, firePoints = [], sel
                         <div style="font-size:10px;color:#007bff;margin-top:6px;border-top:1px solid #eee;padding-top:6px;font-weight:700">💨 Meteoroloji (Anlık)</div>
                         <div style="font-size:11px;color:#444;margin-bottom:2px">Rüzgar: <b>${point.wind_speed.toFixed(1)} m/s</b> (${point.wind_deg}°)</div>
                         <div style="font-size:11px;color:#444;margin-bottom:2px">Nem: <b>%${point.humidity}</b> | <b>${point.description}</b></div>
-                    ` : ''}
+                    ` : `
+                        <div style="font-size:9px;color:#999;margin-top:6px;border-top:1px solid #eee;padding-top:6px;font-style:italic">
+                            *Meteoroloji sensörü yalnız yüksek risk/kırmızı kodlu öncelikli yangınlar için aktiftir.
+                        </div>
+                    `}
 
                     <div style="font-size:10px;color:#888;margin-top:4px;border-top:1px solid #eee;padding-top:4px">Kaynak: NASA & OWM</div>
-                </div>`
-            );
+                </div>`;
+
+            circle.bindPopup(popupHtml);
             fireGroup.addLayer(circle);
 
             // 🔥 İkon marker
-            fireGroup.addLayer(L.marker([point.lat, point.lon], {
+            const iconMarker = L.marker([point.lat, point.lon], {
                 icon: L.divIcon({
                     className: 'custom-marker',
                     html: `<span class="material-symbols-outlined ${iconClass[point.color] || 'text-gray-400'} bg-white/90 rounded-full p-1 shadow-lg" style="font-variation-settings:'FILL' 1;font-size:14px">local_fire_department</span>`,
                     iconSize: [24, 24], iconAnchor: [12, 12],
                 }),
-            }));
+            });
+            iconMarker.bindPopup(popupHtml);
+            fireGroup.addLayer(iconMarker);
 
             // 💨 Rüzgar Vektörü (Ok) — Eğer veri varsa
             if (point.wind_speed !== null) {
