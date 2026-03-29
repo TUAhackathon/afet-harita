@@ -28,13 +28,6 @@ export default function MapComponent({ layers, routeStatus, firePoints = [], sel
                 attribution: '&copy; OpenStreetMap &copy; CARTO',
             }).addTo(map);
 
-            map.createPane('roadsPane');
-            map.getPane('roadsPane').style.zIndex = 350;
-            map.getPane('roadsPane').classList.add('leaflet-roads-pane');
-            L.tileLayer('https://tiles.stadiamaps.com/tiles/stamen_toner_lines/{z}/{x}/{y}{r}.png', {
-                pane: 'roadsPane', opacity: 0.65,
-            }).addTo(map);
-
             L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png').addTo(map);
             L.control.zoom({ position: 'bottomright' }).addTo(map);
 
