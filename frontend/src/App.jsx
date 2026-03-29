@@ -123,6 +123,7 @@ function App() {
                 setToInput={setToInput}
                 onCalculateRoute={handleCalculateRoute}
                 routeStatus={routeStatus}
+                isSidebarOpen={isSidebarOpen}
             />
             <Sidebar
                 layers={layers}

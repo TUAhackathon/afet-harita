@@ -2,7 +2,7 @@
  * Header.jsx — BKZS Komuta Çubuğu
  * Sistem logosu + arama girişleri + rota hesaplama butonu
  */
-export default function Header({ fromInput, setFromInput, toInput, setToInput, onCalculateRoute, routeStatus }) {
+export default function Header({ fromInput, setFromInput, toInput, setToInput, onCalculateRoute, routeStatus, isSidebarOpen }) {
     const isLoading = routeStatus?.status === 'loading';
 
     const handleKeyDown = (e, nextId) => {
@@ -13,7 +13,9 @@ export default function Header({ fromInput, setFromInput, toInput, setToInput, o
     };
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-[1000] flex items-center justify-center px-6 pt-4 pb-2 pointer-events-none">
+        <header className={`fixed top-0 right-0 z-[1000] flex items-center justify-center px-6 pt-4 pb-2 pointer-events-none transition-all duration-500 ease-in-out ${
+            isSidebarOpen ? 'left-[300px]' : 'left-0'
+        }`}>
             <div className="w-full max-w-4xl flex items-center gap-3 pointer-events-auto">
 
 
