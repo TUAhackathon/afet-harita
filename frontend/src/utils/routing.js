@@ -9,7 +9,8 @@ import L from 'leaflet';
 
 /* ─── Geocoding ─────────────────────────────────────────────── */
 export async function geocode(placeName) {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(placeName)}&countrycodes=tr&limit=1`;
+    // Türkiye ve Hindistan'da arama yap
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(placeName)}&countrycodes=tr,in&limit=1`;
     try {
         const res = await fetch(url, { headers: { 'Accept-Language': 'tr' } });
         if (!res.ok) throw new Error(`Geocoding HTTP ${res.status}`);

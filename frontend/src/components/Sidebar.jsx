@@ -4,7 +4,7 @@
  */
 import { useState } from 'react';
 
-export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoading = false, fireError = null, lastFetchTime, isOpen, setIsOpen }) {
+export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoading = false, fireError = null, lastFetchTime, isOpen, setIsOpen, region, onRegionChange }) {
 
     // Yangın istatistikleri (NASA FIRMS verisi)
     const redCount    = firePoints.filter(f => f.color === 'red').length;
@@ -66,6 +66,41 @@ export default function Sidebar({ layers, toggleLayer, firePoints = [], fireLoad
                         </p>
                     </div>
 
+                </div>
+
+                {/* ── Bölge Seçici ───────────────────────── */}
+                <div className="shrink-0 mb-5">
+                    <div className="text-[9px] text-slate-500 font-black uppercase tracking-[0.2em] mb-2">
+                        Aktif Konum
+                    </div>
+                    <div className="flex bg-slate-900/50 rounded-xl p-1 border border-slate-800/50 relative overflow-hidden">
+                        <div 
+                            className={`absolute inset-y-1 w-[calc(50%-4px)] bg-slate-800/80 border border-slate-700/50 rounded-lg shadow-sm transition-transform duration-300 ease-out z-0
+                            ${region === 'tr' ? 'translate-x-[2px]' : 'translate-x-[calc(100%+6px)]'}`}
+                        />
+                        <button
+                            onClick={() => onRegionChange('tr')}
+                            className={`relative z-10 flex-1 flex justify-center items-center gap-2 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer ${
+                                region === 'tr' 
+                                ? 'text-emerald-400'
+                                : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>public</span>
+                            Türkiye
+                        </button>
+                        <button
+                            onClick={() => onRegionChange('in')}
+                            className={`relative z-10 flex-1 flex justify-center items-center gap-2 py-2 text-[10px] font-bold uppercase tracking-wider rounded-lg transition-colors cursor-pointer ${
+                                region === 'in' 
+                                ? 'text-blue-400'
+                                : 'text-slate-500 hover:text-slate-300'
+                            }`}
+                        >
+                            <span className="material-symbols-outlined text-[13px]" style={{ fontVariationSettings: "'FILL' 1" }}>public</span>
+                            Hindistan
+                        </button>
+                    </div>
                 </div>
 
                 {/* ── Tehdit Seviyesi ────────────────────── */}

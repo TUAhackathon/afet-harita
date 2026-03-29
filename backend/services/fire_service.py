@@ -66,16 +66,38 @@ def _process_fire_data(df: pd.DataFrame) -> list[FirePoint]:
         logger.warning("Brightness column not found in FIRMS data. Columns: %s", list(df.columns))
         return []
 
+    # UI Performans Optimizasyonu: Her bölge için Düşük/Orta riskleri 10 ile, yüksek riskleri 250 ile sınırla
+    if "region" in df.columns:
+        def filter_region(group):
+            reds = group[group[brightness_col] >= 360].nlargest(250, brightness_col)
+            yellows = group[(group[brightness_col] >= 330) & (group[brightness_col] < 360)].nlargest(10, brightness_col)
+            greens = group[group[brightness_col] < 330].nlargest(10, brightness_col)
+
+            # Rüzgar/Hava durumu çekilecek hedefleri eşdeğer, orta ve yüksek risklere bölüyoruz.
+            reds = reds.assign(fetch_weather=False)
+            yellows = yellows.assign(fetch_weather=False)
+            greens = greens.assign(fetch_weather=False)
+
+            if not reds.empty:
+                reds.iloc[:min(10, len(reds)), reds.columns.get_loc('fetch_weather')] = True
+            if not yellows.empty:
+                yellows.iloc[:min(5, len(yellows)), yellows.columns.get_loc('fetch_weather')] = True
+
+            return pd.concat([reds, yellows, greens])
+        
+        df = df.groupby("region", group_keys=False).apply(filter_region).reset_index(drop=True)
+
+    import concurrent.futures
     results: list[FirePoint] = []
     
-    # Hava durumu verisi çekilecek maksimum nokta sayısı (API limitlerini korumak için)
-    MAX_WEATHER_POINTS = 20
-    weather_count = 0
+    # Hava durumu verisi çekilecek noktaları tutalım
+    weather_tasks = []
 
     for _, row in df.iterrows():
         lat = row.get("latitude")
         lon = row.get("longitude")
         brightness = row.get(brightness_col)
+        should_fetch_weather = row.get("fetch_weather", False)
 
         if pd.isna(lat) or pd.isna(lon):
             continue
@@ -87,31 +109,47 @@ def _process_fire_data(df: pd.DataFrame) -> list[FirePoint]:
         except (ValueError, TypeError):
             continue
 
-        # Türkiye yakın bölge bounding box doğrulaması
-        if not (30 <= lat_f <= 45 and 24 <= lon_f <= 47):
+        # Bölge bazlı bounding box doğrulaması
+        def is_in_supported_region(lt, ln):
+            # Türkiye (Genişletilmiş)
+            if (35 <= lt <= 43 and 25 <= ln <= 46): return True
+            # Hindistan
+            if (6 <= lt <= 38 and 68 <= ln <= 98): return True
+            return False
+
+        if not is_in_supported_region(lat_f, lon_f):
             continue
 
         color, level = _classify_fire(brightness)
 
-        # Hava durumu verisi ekle (Eğer limit dolmadıysa)
-        weather_data = None
-        if weather_count < MAX_WEATHER_POINTS:
-            weather_data = fetch_weather_for_point(lat, lon)
-            if weather_data:
-                weather_count += 1
-
-        results.append(FirePoint(
+        point = FirePoint(
             lat=lat_f,
             lon=lon_f,
             level=level,
             brightness=float(brightness) if not pd.isna(brightness) else 0.0,
             color=color,
-            # Meteoroloji
-            wind_speed=weather_data["wind_speed"] if weather_data else None,
-            wind_deg=weather_data["wind_deg"] if weather_data else None,
-            humidity=weather_data["humidity"] if weather_data else None,
-            description=weather_data["description"] if weather_data else None
-        ))
+            wind_speed=None, wind_deg=None, humidity=None, description=None
+        )
+        results.append(point)
+        
+        # Sadece eşdeğer dağıtılmış hedefleri sıraya al
+        if should_fetch_weather:
+            weather_tasks.append((len(results) - 1, lat_f, lon_f))
+
+    # Paralel Hava Durumu API İstekleri (Multi-threading ile sıfır bekleme)
+    if weather_tasks:
+        def solve_weather(idx, lt, ln):
+            return idx, fetch_weather_for_point(lt, ln)
+            
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(20, len(weather_tasks))) as executor:
+            futures = [executor.submit(solve_weather, task[0], task[1], task[2]) for task in weather_tasks]
+            for future in concurrent.futures.as_completed(futures):
+                idx, weather_data = future.result()
+                if weather_data:
+                    results[idx].wind_speed = weather_data.get("wind_speed")
+                    results[idx].wind_deg = weather_data.get("wind_deg")
+                    results[idx].humidity = weather_data.get("humidity")
+                    results[idx].description = weather_data.get("description")
 
     return results
 

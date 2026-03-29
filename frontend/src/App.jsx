@@ -20,6 +20,13 @@ function App() {
     const [fireLoading, setFireLoading] = useState(false);
     const [fireError, setFireError] = useState(null);
     const [lastFetchTime, setLastFetchTime] = useState(null);
+    const [region, setRegion]     = useState('tr'); // 'tr' veya 'in'
+
+    const handleRegionChange = (newRegion) => {
+        setRegion(newRegion);
+        // Toast ile bilgi ver
+        showToast(`${newRegion === 'tr' ? 'Türkiye' : 'Hindistan'} bölgesine geçildi.`, 'info');
+    };
 
     // Rota durumu
     const [routeStatus, setRouteStatus] = useState({ status: 'idle', payload: null, error: null });
@@ -49,7 +56,8 @@ function App() {
                     setFirePoints(data);
                     setLastFetchTime(new Date());
                     if (data.length === 0) {
-                        showToast("Şu anda Türkiye genelinde aktif yangın kaydı bulunmamaktadır.", 'info');
+                        const regionName = region === 'in' ? 'Hindistan' : 'Türkiye';
+                        showToast(`Şu anda ${regionName} genelinde aktif yangın kaydı bulunmamaktadır.`, 'info');
                     }
                 } catch (err) {
                     console.error('Yangın verisi alınamadı:', err);
@@ -62,7 +70,7 @@ function App() {
             }
         }
         setLayers(prev => ({ ...prev, [layerName]: nextState }));
-    }, [layers, firePoints.length, fireLoading]);
+    }, [layers, firePoints.length, fireLoading, region]);
 
     const handleCalculateRoute = async () => {
         if (!fromInput.trim() || !toInput.trim()) {
@@ -127,6 +135,7 @@ function App() {
                 firePoints={firePoints}
                 selectedRouteId={selectedRouteId}
                 onSelectRoute={handleSelectRoute}
+                region={region}
             />
             <Header
                 fromInput={fromInput}
@@ -137,14 +146,17 @@ function App() {
                 routeStatus={routeStatus}
                 isSidebarOpen={isSidebarOpen}
             />
-            <Sidebar
-                layers={layers}
+            <Sidebar 
+                layers={layers} 
                 toggleLayer={toggleLayer}
                 firePoints={firePoints}
                 fireLoading={fireLoading}
                 fireError={fireError}
+                lastFetchTime={lastFetchTime}
                 isOpen={isSidebarOpen}
                 setIsOpen={setIsSidebarOpen}
+                region={region}
+                onRegionChange={handleRegionChange}
             />
             <RoutePanel
                 routeStatus={routeStatus}
