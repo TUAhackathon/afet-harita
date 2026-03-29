@@ -1,16 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { floodData } from '../utils/data';
 
-const API_BASE = 'http://localhost:8000';
-
-export default function MapComponent({ layers, routeStatus }) {
+export default function MapComponent({ layers, routeStatus, firePoints = [] }) {
     const mapRef = useRef(null);
     const fireLayerGroupRef = useRef(L.layerGroup());
     const floodLayerGroupRef = useRef(L.layerGroup());
     const routeLayerGroupRef = useRef(L.layerGroup());
-    const [fireDataLoaded, setFireDataLoaded] = useState(false);
-    const fireDataRef = useRef([]);
 
     useEffect(() => {
         if (!mapRef.current) {
@@ -68,74 +64,79 @@ export default function MapComponent({ layers, routeStatus }) {
         }
     }, []);
 
-    // Fetch fire data from backend when fire layer is toggled on
+    // Update fire markers when firePoints prop changes
     useEffect(() => {
-        if (layers.fire && !fireDataLoaded) {
-            fetch(`${API_BASE}/api/disasters/fire`)
-                .then(res => {
-                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                    return res.json();
-                })
-                .then(data => {
-                    fireDataRef.current = data;
-                    setFireDataLoaded(true);
+        if (!mapRef.current) return;
+        const fireGroup = fireLayerGroupRef.current;
+        fireGroup.clearLayers();
 
-                    // Build fire markers from satellite data
-                    const fireGroup = fireLayerGroupRef.current;
-                    fireGroup.clearLayers();
+        firePoints.forEach(point => {
+            const colorMap = {
+                green: { border: '#22c55e', fill: '#4ade80' },
+                yellow: { border: '#eab308', fill: '#facc15' },
+                red: { border: '#ff4500', fill: '#ff6b35' },
+                gray: { border: '#9ca3af', fill: '#d1d5db' },
+            };
+            const colors = colorMap[point.color] || colorMap.gray;
+            const iconClass = {
+                green: 'text-green-500',
+                yellow: 'text-yellow-500',
+                red: 'text-orange-500',
+                gray: 'text-gray-400',
+            };
 
-                    data.forEach(point => {
-                        // Color mapping for circles based on severity
-                        const colorMap = {
-                            green: { border: '#22c55e', fill: '#4ade80' },
-                            yellow: { border: '#eab308', fill: '#facc15' },
-                            red: { border: '#ff4500', fill: '#ff6b35' },
-                            gray: { border: '#9ca3af', fill: '#d1d5db' },
-                        };
-                        const colors = colorMap[point.color] || colorMap.gray;
+            // Nokta marker
+            const circle = L.circleMarker([point.lat, point.lon], {
+                radius: point.color === 'red' ? 8 : point.color === 'yellow' ? 6 : 4,
+                color: colors.border, fillColor: colors.fill, fillOpacity: 0.75, weight: 2,
+            });
+            circle.bindPopup(
+                `<div style="font-family:Inter,sans-serif;min-width:170px;padding:4px 0">
+                    <div style="font-weight:800;font-size:13px;margin-bottom:6px;color:#1a1a2e">${point.level}</div>
+                    <div style="font-size:11px;color:#555;margin-bottom:2px">🌡 Brightness: <b>${point.brightness.toFixed(1)} K</b></div>
+                    <div style="font-size:11px;color:#555;margin-bottom:2px">📍 ${point.lat.toFixed(4)}°N, ${point.lon.toFixed(4)}°E</div>
+                    
+                    ${point.wind_speed !== null ? `
+                        <div style="font-size:10px;color:#007bff;margin-top:6px;border-top:1px solid #eee;padding-top:6px;font-weight:700">💨 Meteoroloji (Anlık)</div>
+                        <div style="font-size:11px;color:#444;margin-bottom:2px">Rüzgar: <b>${point.wind_speed.toFixed(1)} m/s</b> (${point.wind_deg}°)</div>
+                        <div style="font-size:11px;color:#444;margin-bottom:2px">Nem: <b>%${point.humidity}</b> | <b>${point.description}</b></div>
+                    ` : ''}
 
-                        // Icon mapping for different severity levels
-                        const iconColorClass = {
-                            green: 'text-green-500',
-                            yellow: 'text-yellow-500',
-                            red: 'text-orange-500',
-                            gray: 'text-gray-400',
-                        };
+                    <div style="font-size:10px;color:#888;margin-top:4px;border-top:1px solid #eee;padding-top:4px">Kaynak: NASA & OWM</div>
+                </div>`
+            );
+            fireGroup.addLayer(circle);
 
-                        const circle = L.circleMarker([point.lat, point.lon], {
-                            radius: point.color === 'red' ? 8 : point.color === 'yellow' ? 6 : 4,
-                            color: colors.border,
-                            fillColor: colors.fill,
-                            fillOpacity: 0.7,
-                            weight: 2,
-                        });
-                        circle.bindPopup(
-                            `<div style="font-family: Inter, sans-serif; min-width: 160px;">
-                                <div style="font-weight: 700; font-size: 13px; margin-bottom: 4px;">${point.level}</div>
-                                <div style="font-size: 11px; color: #555;">Brightness: <b>${point.brightness.toFixed(1)}</b></div>
-                                <div style="font-size: 11px; color: #555;">Konum: ${point.lat.toFixed(4)}, ${point.lon.toFixed(4)}</div>
-                            </div>`
-                        );
-                        fireGroup.addLayer(circle);
+            // İkon marker
+            fireGroup.addLayer(L.marker([point.lat, point.lon], {
+                icon: L.divIcon({
+                    className: 'custom-marker',
+                    html: `<span class="material-symbols-outlined ${iconClass[point.color] || 'text-gray-400'} bg-white/90 rounded-full p-1 shadow-lg" style="font-variation-settings:'FILL' 1;font-size:14px">local_fire_department</span>`,
+                    iconSize: [24, 24], iconAnchor: [12, 12],
+                }),
+            }));
 
-                        const marker = L.marker([point.lat, point.lon], {
-                            icon: L.divIcon({
-                                className: 'custom-marker',
-                                html: `<div class="flex flex-col items-center"><span class="material-symbols-outlined ${iconColorClass[point.color] || 'text-gray-400'} bg-white/90 rounded-full p-1 shadow-lg" style="font-variation-settings: 'FILL' 1; font-size: 14px;">local_fire_department</span></div>`,
-                                iconSize: [24, 24],
-                                iconAnchor: [12, 12]
-                            })
-                        });
-                        fireGroup.addLayer(marker);
-                    });
-                })
-                .catch(err => {
-                    console.error('Fire data fetch error:', err);
+            // 💨 Rüzgar Vektörü (Ok) — Eğer veri varsa
+            if (point.wind_speed !== null) {
+                const arrowIcon = L.divIcon({
+                    className: 'wind-arrow-marker',
+                    html: `<div style="transform: rotate(${point.wind_deg}deg); transition: transform 0.5s ease;">
+                        <span class="material-symbols-outlined text-blue-500/80 drop-shadow-md" style="font-size: ${Math.min(32, 16 + (point.wind_speed || 0) * 2)}px; font-weight: 900;">north</span>
+                    </div>`,
+                    iconSize: [32, 32],
+                    iconAnchor: [16, 16]
                 });
-        }
-    }, [layers.fire, fireDataLoaded]);
+                
+                fireGroup.addLayer(L.marker([point.lat, point.lon], { 
+                    icon: arrowIcon,
+                    interactive: false,
+                    zIndexOffset: -100
+                }));
+            }
+        });
+    }, [firePoints]);
 
-    // Toggle layers on/off
+    /* ─── Katman Toggle ────────────────────────── */
     useEffect(() => {
         if (!mapRef.current) return;
         const map = mapRef.current;

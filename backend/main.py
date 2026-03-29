@@ -48,6 +48,6 @@ def read_root():
     return {"message": "Welcome to Afet Harita API"}
 
 
-@app.get("/health")
+@app.get("/api/health")
 def health_check():
     return {"status": "healthy"}

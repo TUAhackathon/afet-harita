@@ -13,6 +13,7 @@ import pandas as pd
 
 from models.disaster_models import FirePoint
 from utils.nasa_client import fetch_fire_data
+from utils.weather_client import fetch_weather_for_point
 
 
 logger = logging.getLogger(__name__)
@@ -62,6 +63,10 @@ def _process_fire_data(df: pd.DataFrame) -> list[FirePoint]:
         return []
 
     results: list[FirePoint] = []
+    
+    # Hava durumu verisi çekilecek maksimum nokta sayısı (API limitlerini korumak için)
+    MAX_WEATHER_POINTS = 20
+    weather_count = 0
 
     for _, row in df.iterrows():
         lat = row.get("latitude")
@@ -73,12 +78,24 @@ def _process_fire_data(df: pd.DataFrame) -> list[FirePoint]:
 
         color, level = _classify_fire(brightness)
 
+        # Hava durumu verisi ekle (Eğer limit dolmadıysa)
+        weather_data = None
+        if weather_count < MAX_WEATHER_POINTS:
+            weather_data = fetch_weather_for_point(lat, lon)
+            if weather_data:
+                weather_count += 1
+
         results.append(FirePoint(
             lat=float(lat),
             lon=float(lon),
             level=level,
             brightness=float(brightness) if not pd.isna(brightness) else 0.0,
             color=color,
+            # Meteoroloji
+            wind_speed=weather_data["wind_speed"] if weather_data else None,
+            wind_deg=weather_data["wind_deg"] if weather_data else None,
+            humidity=weather_data["humidity"] if weather_data else None,
+            description=weather_data["description"] if weather_data else None
         ))
 
     return results

@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import RoutePanel from './components/RoutePanel';
 import MapComponent from './components/MapComponent';
 import Legend from './components/Legend';
-import NotificationBanner from './components/NotificationBanner';
+import StatusBar from './components/StatusBar';
+import Toast from './components/Toast';
 import { geocode, getRoute, calculateSafety } from './utils/routing';
+import { fetchFirePoints } from './services/api';
 import './index.css';
 
 function App() {
@@ -16,9 +18,43 @@ function App() {
     // status: 'idle' | 'loading' | 'success' | 'error'
     const [routeStatus, setRouteStatus] = useState({ status: 'idle', payload: null, error: null });
 
-    const toggleLayer = (layerName) => {
-        setLayers(prev => ({ ...prev, [layerName]: !prev[layerName] }));
+    // Yangın verisi durumu
+    const [firePoints, setFirePoints] = useState([]);
+    const [fireLoading, setFireLoading] = useState(false);
+    const [fireError, setFireError] = useState(null);
+    const [lastFetchTime, setLastFetchTime] = useState(null);
+
+    // Seçili rota ID
+    const [selectedRouteId, setSelectedRouteId] = useState('safe');
+
+    // Bildirim durumu
+    const [toast, setToast] = useState(null);
+
+    const showToast = (message, type = 'info') => {
+        setToast({ message, type });
     };
+
+    const toggleLayer = useCallback(async (layerName) => {
+        if (layerName === 'fire' && !layers.fire && firePoints.length === 0 && !fireLoading) {
+            setFireLoading(true);
+            setFireError(null);
+            try {
+                const data = await fetchFirePoints();
+                setFirePoints(data);
+                setLastFetchTime(new Date());
+                if (data.length === 0) {
+                    showToast("Şu anda Türkiye genelinde aktif yangın kaydı bulunmamaktadır.", 'info');
+                }
+            } catch (err) {
+                console.error('Yangın verisi alınamadı:', err);
+                setFireError(err.message);
+                showToast("Yangın verileri alınırken bir hata oluştu.", "error");
+            } finally {
+                setFireLoading(false);
+            }
+        }
+        setLayers(prev => ({ ...prev, [layerName]: !prev[layerName] }));
+    }, [layers, firePoints, fireLoading]);
 
     const handleCalculateRoute = async () => {
         if (!fromInput.trim() || !toInput.trim()) {
@@ -75,20 +111,51 @@ function App() {
         setToInput('');
     };
 
+    const handleSelectRoute = (id) => {
+        setSelectedRouteId(id);
+    };
+
     return (
         <div className="relative w-full h-screen overflow-hidden bg-background text-on-background">
-            <MapComponent layers={layers} routeStatus={routeStatus} />
+            <MapComponent
+                layers={layers}
+                routeStatus={routeStatus}
+                firePoints={firePoints}
+                selectedRouteId={selectedRouteId}
+                onSelectRoute={handleSelectRoute}
+            />
             <Header 
                 fromInput={fromInput} 
                 setFromInput={setFromInput} 
                 toInput={toInput} 
                 setToInput={setToInput} 
                 onCalculateRoute={handleCalculateRoute} 
+                routeStatus={routeStatus}
             />
-            <NotificationBanner />
-            <Sidebar layers={layers} toggleLayer={toggleLayer} />
-            <RoutePanel routeStatus={routeStatus} onClearRoute={handleClearRoute} />
+            <Sidebar 
+                layers={layers} 
+                toggleLayer={toggleLayer} 
+                firePoints={firePoints}
+                fireLoading={fireLoading}
+                fireError={fireError}
+                lastFetchTime={lastFetchTime}
+            />
+            <RoutePanel 
+                routeStatus={routeStatus} 
+                selectedRouteId={selectedRouteId}
+                onSelectRoute={handleSelectRoute}
+                onClearRoute={handleClearRoute} 
+            />
             <Legend />
+            <StatusBar firePoints={firePoints} lastFetchTime={lastFetchTime} />
+            
+            {toast && (
+                <Toast 
+                    message={toast.message} 
+                    type={toast.type} 
+                    onClose={() => setToast(null)} 
+                />
+            )}
         </div>
     );
 }
