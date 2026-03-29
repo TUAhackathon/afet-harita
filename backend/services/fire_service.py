@@ -72,6 +72,17 @@ def _process_fire_data(df: pd.DataFrame) -> list[FirePoint]:
             reds = group[group[brightness_col] >= 360].nlargest(250, brightness_col)
             yellows = group[(group[brightness_col] >= 330) & (group[brightness_col] < 360)].nlargest(10, brightness_col)
             greens = group[group[brightness_col] < 330].nlargest(10, brightness_col)
+
+            # Rüzgar/Hava durumu çekilecek hedefleri eşdeğer, orta ve yüksek risklere bölüyoruz.
+            reds = reds.assign(fetch_weather=False)
+            yellows = yellows.assign(fetch_weather=False)
+            greens = greens.assign(fetch_weather=False)
+
+            if not reds.empty:
+                reds.iloc[:min(10, len(reds)), reds.columns.get_loc('fetch_weather')] = True
+            if not yellows.empty:
+                yellows.iloc[:min(5, len(yellows)), yellows.columns.get_loc('fetch_weather')] = True
+
             return pd.concat([reds, yellows, greens])
         
         df = df.groupby("region", group_keys=False).apply(filter_region).reset_index(drop=True)
@@ -80,13 +91,13 @@ def _process_fire_data(df: pd.DataFrame) -> list[FirePoint]:
     results: list[FirePoint] = []
     
     # Hava durumu verisi çekilecek noktaları tutalım
-    MAX_WEATHER_POINTS = 20
     weather_tasks = []
 
     for _, row in df.iterrows():
         lat = row.get("latitude")
         lon = row.get("longitude")
         brightness = row.get(brightness_col)
+        should_fetch_weather = row.get("fetch_weather", False)
 
         if pd.isna(lat) or pd.isna(lon):
             continue
@@ -121,8 +132,8 @@ def _process_fire_data(df: pd.DataFrame) -> list[FirePoint]:
         )
         results.append(point)
         
-        # En yüksek öncelikli noktalara limit kadar görev ata
-        if len(weather_tasks) < MAX_WEATHER_POINTS:
+        # Sadece eşdeğer dağıtılmış hedefleri sıraya al
+        if should_fetch_weather:
             weather_tasks.append((len(results) - 1, lat_f, lon_f))
 
     # Paralel Hava Durumu API İstekleri (Multi-threading ile sıfır bekleme)
