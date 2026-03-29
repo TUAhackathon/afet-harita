@@ -10,14 +10,19 @@ import L from 'leaflet';
 /* ─── Geocoding ─────────────────────────────────────────────── */
 export async function geocode(placeName) {
     const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(placeName)}&countrycodes=tr&limit=1`;
-    const res = await fetch(url, { headers: { 'Accept-Language': 'tr' } });
-    const data = await res.json();
-    if (!data.length) return null;
-    return {
-        lat: parseFloat(data[0].lat),
-        lng: parseFloat(data[0].lon),
-        name: data[0].display_name.split(',')[0],
-    };
+    try {
+        const res = await fetch(url, { headers: { 'Accept-Language': 'tr' } });
+        if (!res.ok) throw new Error(`Geocoding HTTP ${res.status}`);
+        const data = await res.json();
+        if (!data.length) return null;
+        return {
+            lat: parseFloat(data[0].lat),
+            lng: parseFloat(data[0].lon),
+            name: data[0].display_name.split(',')[0],
+        };
+    } catch (err) {
+        throw new Error(`Konum arama hizmetine ulaşılamadı. İnternet bağlantınızı kontrol edin.`);
+    }
 }
 
 /* ─── OSRM Helpers ──────────────────────────────────────────── */
@@ -85,6 +90,10 @@ function generateBracketWaypoints(from, to, threat, allThreats) {
     const dLat = to.lat - from.lat;
     const dLng = to.lng - from.lng;
     const len  = Math.sqrt(dLat * dLat + dLng * dLng);
+
+    // Başlangıç ve bitiş noktası çakışıyorsa bypass üretilemez
+    if (len < 0.0001) return [];
+
     const normLat = dLat / len;
     const normLng = dLng / len;
     const perpLat = -normLng;
@@ -168,9 +177,10 @@ export async function getHazardAwareRoute(from, to, firePoints = []) {
     }
 }
 
-/* ─── Safety Score ──────────────────────────────────────────── */
+/* ─── Safety Score ────────────────────────────────── */
 export function calculateSafety(routeCoords, liveFirePoints = []) {
     if (!liveFirePoints?.length) return 97;
+    if (!routeCoords?.length)    return 97;  // NaN guard: koordinat yoksa güvenli say
 
     let weightedDanger = 0;
     const totalPoints  = routeCoords.length;
@@ -186,8 +196,12 @@ export function calculateSafety(routeCoords, liveFirePoints = []) {
         });
     });
 
+    // totalPoints veya liveFirePoints.length sıfır olamaz (yukarıda guard'landı)
     const dangerRatio = weightedDanger / (totalPoints * liveFirePoints.length * 3);
-    return Math.max(15, Math.round(100 - dangerRatio * 350));
+    const score = Math.round(100 - dangerRatio * 350);
+    // NaN veya Infinity koruması
+    if (!isFinite(score)) return 97;
+    return Math.max(15, Math.min(100, score));
 }
 
 /* ─── Ana Fonksiyon: Tüm Alternatifleri Hesapla ─────────────── */
@@ -217,7 +231,7 @@ export async function getAllRoutes(from, to, firePoints = []) {
     const { directRoute, safeRoute, threats, bypassed = 0, remainingThreats = 0 } = hazardResult;
     if (!directRoute) return { routes: [], threats: [] };
 
-    // Rota tanımları — görsel kimlik
+    // Rota tanımları — null route olanları filtrele
     const routeDefinitions = [
         {
             id: 'safe',
@@ -241,7 +255,9 @@ export async function getAllRoutes(from, to, firePoints = []) {
             bypassed: 0,
             remainingThreats: 0,
         })),
-    ];
+    ].filter(def => def.route?.geometry?.coordinates?.length > 0);  // null / geçersiz rotaları çıkar
+
+    if (!routeDefinitions.length) return { routes: [], threats };
 
     // Güvenlik skorlarını hesapla
     const routes = routeDefinitions.map(def => ({

@@ -37,8 +37,9 @@ export default function MapComponent({ layers, routeStatus, firePoints = [], sel
             L.control.zoom({ position: 'bottomright' }).addTo(map);
 
             mapRef.current = map;
-            bufferLayerGroupRef.current.addTo(map);
+            // routeLayerGroup her zaman haritada (rotalar için)
             routeLayerGroupRef.current.addTo(map);
+            // fire & buffer layerlar başlangıçta eklenmez — toggle ile yönetilir
         }
     }, []);
 
@@ -106,11 +107,11 @@ export default function MapComponent({ layers, routeStatus, firePoints = [], sel
         const map = mapRef.current;
 
         if (layers.fire) {
-            fireLayerGroupRef.current.addTo(map);
-            bufferLayerGroupRef.current.addTo(map);
+            if (!map.hasLayer(fireLayerGroupRef.current))   fireLayerGroupRef.current.addTo(map);
+            if (!map.hasLayer(bufferLayerGroupRef.current)) bufferLayerGroupRef.current.addTo(map);
         } else {
-            fireLayerGroupRef.current.remove();
-            bufferLayerGroupRef.current.remove();
+            if (map.hasLayer(fireLayerGroupRef.current))   fireLayerGroupRef.current.remove();
+            if (map.hasLayer(bufferLayerGroupRef.current)) bufferLayerGroupRef.current.remove();
         }
     }, [layers]);
 

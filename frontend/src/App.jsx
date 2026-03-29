@@ -4,7 +4,6 @@ import Sidebar from './components/Sidebar';
 import RoutePanel from './components/RoutePanel';
 import MapComponent from './components/MapComponent';
 import Legend from './components/Legend';
-import StatusBar from './components/StatusBar';
 import { geocode, getAllRoutes } from './utils/routing';
 import { fetchFirePoints } from './services/api';
 import './index.css';
@@ -27,22 +26,29 @@ function App() {
     const [selectedRouteId, setSelectedRouteId] = useState('safe');
 
     const toggleLayer = useCallback(async (layerName) => {
-        if (layerName === 'fire' && !layers.fire && firePoints.length === 0 && !fireLoading) {
-            setFireLoading(true);
+        const nextState = !layers[layerName];
+
+        if (layerName === 'fire' && nextState && !fireLoading) {
+            // Her açılışta hata sıfırla, veri yoksa çek
             setFireError(null);
-            try {
-                const data = await fetchFirePoints();
-                setFirePoints(data);
-                setLastFetchTime(new Date());
-            } catch (err) {
-                console.error('Yangın verisi alınamadı:', err);
-                setFireError(err.message);
-            } finally {
-                setFireLoading(false);
+            if (firePoints.length === 0) {
+                setFireLoading(true);
+                try {
+                    const data = await fetchFirePoints();
+                    setFirePoints(data);
+                    setLastFetchTime(new Date());
+                } catch (err) {
+                    console.error('Yangın verisi alınamadı:', err);
+                    setFireError(err.message);
+                    // Hata olduğunda layer'ı açma
+                    return;
+                } finally {
+                    setFireLoading(false);
+                }
             }
         }
-        setLayers(prev => ({ ...prev, [layerName]: !prev[layerName] }));
-    }, [layers.fire, firePoints.length, fireLoading]);
+        setLayers(prev => ({ ...prev, [layerName]: nextState }));
+    }, [layers, firePoints.length, fireLoading]);
 
     const handleCalculateRoute = async () => {
         if (!fromInput.trim() || !toInput.trim()) {
@@ -130,7 +136,6 @@ function App() {
                 onClearRoute={handleClearRoute}
             />
             <Legend />
-            <StatusBar firePoints={firePoints} lastFetchTime={lastFetchTime} />
         </div>
     );
 }
